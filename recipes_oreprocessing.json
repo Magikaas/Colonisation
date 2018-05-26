@@ -1,0 +1,17 @@
+﻿[
+  {
+    "name": "colonytech.oreprocessor.refinedcopper",
+    "requires": [
+      {
+        "amount": 1,
+        "type": "copper"
+      }
+    ],
+    "results": [
+      {
+        "amount": 1,
+        "type": "refinedcopper"
+      }
+    ]
+  }
+]
