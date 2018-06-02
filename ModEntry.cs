@@ -5,6 +5,7 @@ using System.Net;
 using BlockTypes.Builtin;
 using ColonyTech.Classes;
 using ColonyTech.BlockNPCs;
+using ColonyTech.Managers;
 using PhentrixGames.NewColonyAPI.Helpers;
 using PhentrixGames.NewColonyAPI;
 using Pipliz.Mods.APIProvider.Jobs;

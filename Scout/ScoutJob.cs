@@ -1,9 +1,13 @@
-﻿using NPC;
+﻿using System;
+using BlockTypes.Builtin;
+using ColonyTech.Managers;
+using NPC;
 using Pipliz;
 using Pipliz.Mods.APIProvider.Jobs;
 using Server.AI;
 using Server.NPCs;
 using UnityEngine;
+using Math = Pipliz.Math;
 using Random = Pipliz.Random;
 
 namespace ColonyTech.Classes
@@ -20,6 +24,14 @@ namespace ColonyTech.Classes
             Excellent
         }
 
+        public enum ScoutDirection
+        {
+            NORTH,
+            EAST,
+            SOUTH,
+            WEST
+        }
+
         public const string JOB_ALIAS = "scoutjob";
         public const string JOB_STATION = "scoutrallypoint";
 
@@ -27,24 +39,119 @@ namespace ColonyTech.Classes
 
         private bool StockedUp;
 
-        private int AreaRange => 15;
+        //Amount of chunks away from scout to check for suitability (0 = own chunk, 1 = 3x3, 2 = 5x5, etc...)
+        private int ChunkCheckRange = 1;
+
+        //Max range from scout rally point to scout, to avoid NPCs going too far away from the base
+        private int MaxChunkScoutRange = 10;
 
         public override string NPCTypeKey => "colonytech." + JOB_STATION;
+
+        public ScoutDirection Direction;
+
+        private ScoutChunkManager getScoutChunkManager()
+        {
+            return ScoutChunkManager.Instance;
+        }
 
         public ITrackableBlock InitializeOnAdd(Vector3Int position, ushort type, Players.Player player)
         {
             InitializeJob(player, position, 0);
+
+            int randomDirection = Random.Next(0, 3);
+
+            switch (randomDirection)
+            {
+                case 0:
+                    this.Direction = ScoutDirection.NORTH;
+                    break;
+                case 1:
+                    this.Direction = ScoutDirection.EAST;
+                    break;
+                case 2:
+                    this.Direction = ScoutDirection.SOUTH;
+                    break;
+                case 3:
+                    this.Direction = ScoutDirection.WEST;
+                    break;
+                default:
+                    this.Direction = ScoutDirection.NORTH;
+                    break;
+            }
+
             return this;
         }
 
-        public NPCBase.NPCGoal CalculateGoal(ref NPCBase.NPCState state)
+        public override NPCBase.NPCGoal CalculateGoal(ref NPCBase.NPCState state)
         {
             Log.Write("CalculateGoal");
             //Always return Job, we can determine the jobLocation based on the time
             return NPCBase.NPCGoal.Job;
         }
+        
+        public Vector3Int findClosestUnscoutedChunk()
+        {
+            var chunkManager = getScoutChunkManager();
 
-        public Vector3Int GetJobLocation()
+            int xStart = this.NPC.Position.x;
+            int y = this.NPC.Position.y;
+            int zStart = this.NPC.Position.z;
+
+            Vector3Int checkedPosition = new Vector3Int(xStart, y, zStart);
+
+            for (int distance = 1; distance < this.MaxChunkScoutRange; distance++)
+            {
+                for (var i = 0; i < distance + 1; i++)
+                {
+                    int x1 = xStart - distance + 1;
+                    int z1 = zStart - i;
+
+                    if (ChunkManagerHasChunkAt(x1, 0, z1, out checkedPosition))
+                    {
+                        return checkedPosition.ToChunk();
+                    }
+
+                    int x2 = xStart + distance - 1;
+                    int z2 = zStart + i;
+
+                    if (ChunkManagerHasChunkAt(x2, 0, z2, out checkedPosition))
+                    {
+                        return checkedPosition.ToChunk();
+                    }
+                }
+
+                for (var i = 1; i < distance; i++)
+                {
+                    int x1 = xStart - i;
+                    int z1 = zStart + distance - i;
+
+                    if (ChunkManagerHasChunkAt(x1, 0, z1, out checkedPosition))
+                    {
+                        return checkedPosition.ToChunk();
+                    }
+
+                    int x2 = xStart + distance -i;
+                    int z2 = zStart - i;
+
+                    if (ChunkManagerHasChunkAt(x2, 0, z2, out checkedPosition))
+                    {
+                        return checkedPosition.ToChunk();
+                    }
+                }
+            }
+
+            return checkedPosition;
+        }
+
+        public bool ChunkManagerHasChunkAt(int x, int y, int z, out Vector3Int currentCheckedPosition)
+        {
+            currentCheckedPosition = new Vector3Int(x, y, z);
+
+            return !getScoutChunkManager().hasChunk(World.GetChunk(currentCheckedPosition));
+        }
+
+        //
+        public override Vector3Int GetJobLocation()
         {
             Log.Write("GetJobLocation");
             if (!StockedUp)
@@ -64,18 +171,37 @@ namespace ColonyTech.Classes
             {
                 var myPos = NPC.Position;
 
-                var randomX = Random.Next(AreaRange * -1, AreaRange);
+                var xOffset = 0;
+                var yOffset = 0;
+
                 var groundLevel = 0;
-                var randomZ = Random.Next(0, AreaRange);
+                var randomZ = Random.Next(0, ChunkCheckRange);
 
                 ushort foundType;
 
+                int randomX = 0;
+
                 for (var i = 0; i < 10; i++)
                 for (var y = 10; y > -10; y--)
-                    //Once we find a block at a certain height 
-                    if (World.TryGetTypeAt(new Vector3Int(randomX, y, randomZ), out foundType))
-                        if (foundType != 0)
+                {
+                    Vector3Int tryTargetLocation = new Vector3Int(randomX, y, randomZ);
+                    //After determining a random x/z, we check how high we have to go
+                    if (World.TryGetTypeAt(tryTargetLocation, out foundType))
+                    {
+                        bool typeIsTree = (foundType == BuiltinBlocks.LeavesTemperate &&
+                                           foundType == BuiltinBlocks.LeavesTaiga &&
+                                           foundType == BuiltinBlocks.LogTemperate &&
+                                           foundType == BuiltinBlocks.LogTaiga);
+
+                        bool isSolid = false;
+
+                        World.TryIsSolid(tryTargetLocation, out isSolid);
+
+                        //Make sure we're not climbing a tree
+                        if (foundType != 0 && !typeIsTree && isSolid)
                             groundLevel = y + 1;
+                    }
+                }
 
 
                 targetLocation = myPos + new Vector3Int(randomX, groundLevel, randomZ);
@@ -93,7 +219,7 @@ namespace ColonyTech.Classes
             return targetLocation;
         }
 
-        public void OnNPCAtJob(ref NPCBase.NPCState state)
+        public override void OnNPCAtJob(ref NPCBase.NPCState state)
         {
             state.SetCooldown(2);
             Log.Write("OnNPCAtJob");
@@ -101,8 +227,10 @@ namespace ColonyTech.Classes
             if (!StockedUp) StockedUp = true;
 
             var commenceBaseBuild = false;
+
             //Check the surrounding area and calculate its average flatness, to determine if it's suitable for a base
             var suitability = calculateAreaSuitability();
+
             switch (suitability)
             {
                 case Suitability.None:
@@ -126,7 +254,7 @@ namespace ColonyTech.Classes
             if (commenceBaseBuild) PrepareBase();
         }
 
-        public void OnNPCAtStockpile(ref NPCBase.NPCState state)
+        public override void OnNPCAtStockpile(ref NPCBase.NPCState state)
         {
             state.SetCooldown(0.5);
         }
@@ -154,7 +282,7 @@ namespace ColonyTech.Classes
 
         private int AmountOfBlocksToCheck()
         {
-            return Math.Pow2(AreaRange * 2 + 1);
+            return Math.Pow2(ChunkCheckRange * 2 + 1);
         }
 
         private Suitability calculateAreaSuitability()
@@ -165,8 +293,8 @@ namespace ColonyTech.Classes
 
             PrepareHeightsTable();
 
-            for (var x = AreaRange * -1; x < AreaRange; x++)
-            for (var z = AreaRange * -1; z < AreaRange; z++)
+            for (var x = ChunkCheckRange * -1; x < ChunkCheckRange; x++)
+            for (var z = ChunkCheckRange * -1; z < ChunkCheckRange; z++)
                 //We check from top to bottom, one square at a time
                 //Once we find a type at said location, we record its 'height' relative to ourselves
                 //And after that, we continue on to the next coordinate, since we know the height
@@ -195,7 +323,7 @@ namespace ColonyTech.Classes
         private void RecordHeight(int x, int y, int z)
         {
             //Pipliz.Log.Write("X: {0}. Y: {1}. Z: {2}", x, y, z);
-            var index = (x + AreaRange) * AreaRange + z + AreaRange;
+            var index = (x + ChunkCheckRange) * ChunkCheckRange + z + ChunkCheckRange;
             //Pipliz.Log.Write("Index to write to: " + index);
             heightsTable[index] = new RecordedHeight(x, y, z);
         }
