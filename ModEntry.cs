@@ -1,40 +1,53 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Net;
+using BlockTypes.Builtin;
+using ColonyTech.Classes;
+using ColonyTech.BlockNPCs;
 using PhentrixGames.NewColonyAPI.Helpers;
 using PhentrixGames.NewColonyAPI;
+using Pipliz.Mods.APIProvider.Jobs;
 
-[ModLoader.ModManager]
-public static class ModEntry
+namespace ColonyTech.Jobs
 {
-    public static string ModFolder;
-    public static string ModGameDataDirectory;
-    public static string LocalizationFolder;
-    public static Version APIVersion = new Version(0, 0, 0, 1);
-
-    [ModLoader.ModCallback(ModLoader.EModCallbackType.OnAssemblyLoaded, "phentrixgames.newcolonyapi.assemblyload")]
-    [ModLoader.ModCallbackProvidesFor("pipliz.blocknpcs.assemblyload")]
-    public static void OnAssemblyLoaded(string path)
+    [ModLoader.ModManager]
+    public static class ModEntry
     {
-        ModFolder = Path.GetDirectoryName(path);
-        ModGameDataDirectory = Path.Combine(Path.GetDirectoryName(path), "gamedata/").Replace("\\", "/");
+        public static string ModFolder;
+        public static string ModGameDataDirectory;
+        public static string LocalizationFolder;
+        public static Version ModVersion = new Version(0, 0, 0, 1);
+        public const string ModName = "ColonyTech";
+        public const string Naming = "ColonyTech.Jobs.";
 
-        LocalizationFolder = Path.Combine(ModGameDataDirectory, "localization/").Replace("\\", "/");
-        Utilities.CreateLogs("ColonyTech");
-        PhentrixGames.NewColonyAPI.Managers.ConfigManager.registerConfig("Magikaas/ColonyTech", "config");
-    }
+        [ModLoader.ModCallback(ModLoader.EModCallbackType.OnAssemblyLoaded, Naming + "OnAssemblyLoaded")]
+        public static void OnAssemblyLoaded(string path)
+        {
+            ModFolder = Path.GetDirectoryName(path);
+            ModGameDataDirectory = Path.Combine(Path.GetDirectoryName(path), "gamedata/").Replace("\\", "/");
 
-    [ModLoader.ModCallbackDependsOn("pipliz.server.localization.waitforloading")]
-    [ModLoader.ModCallbackProvidesFor("pipliz.server.localization.convert")]
-    public static void Localize()
-    {
-        PhentrixGames.NewColonyAPI.Managers.LocalizationManager.Localize("ColonyTech", LocalizationFolder);
-        Utilities.WriteLog("ColonyTech", "Test log", Utilities.LogType.Error, true, Chat.ChatStyle.bolditalic);
-        PhentrixGames.NewColonyAPI.Helpers.Chat.sendToAll("Chat message", Chat.ChatColour.brown, Chat.ChatStyle.bold, Pipliz.Chatting.ChatSenderType.Server);
-    }
+            LocalizationFolder = Path.Combine(ModGameDataDirectory, "localization/").Replace("\\", "/");
+            Utilities.CreateLogs("ColonyTech");
+            PhentrixGames.NewColonyAPI.Managers.ConfigManager.registerConfig("Magikaas/ColonyTech", "config");
+        }
 
-    [ModLoader.ModCallback(ModLoader.EModCallbackType.AfterStartup, "phentrixgames.newcolonyapi.AfterStartup")]
-    public static void AfterStartup()
-    {
-        PhentrixGames.NewColonyAPI.Managers.VersionManager.runVersionCheck("ColonyTech", APIVersion, "https://raw.githubusercontent.com/ThijsVogel/ColonyTech/master/ColonyTech.md");
+        [ModLoader.ModCallback(ModLoader.EModCallbackType.AfterStartup, Naming + "AfterStartup")]
+        public static void AfterStartup()
+        {
+            string versionURL = "https://raw.githubusercontent.com/Magikaas/ColonyTech/master/ColonyTech.md";
+            string version1 = new WebClient().DownloadString(versionURL);
+            
+            PhentrixGames.NewColonyAPI.Managers.ModManager.RegisterMod(ModName, ModFolder, ModVersion, ModFolder + "/config", versionURL);
+        }
+
+        [ModLoader.ModCallback(ModLoader.EModCallbackType.AfterItemTypesDefined, Naming + "RegisterJobs")]
+        [ModLoader.ModCallbackProvidesFor("pipliz.apiprovider.jobs.resolvetypes")]
+        public static void RegisterJobs()
+        {
+            Pipliz.Log.Write("ColonyTech Test");
+            BlockJobManagerTracker.Register<OreProcessorJob>(OreProcessorJob.JOB_STATION);
+            BlockJobManagerTracker.Register<ScoutJob>(ScoutJob.JOB_STATION);
+        }
     }
 }

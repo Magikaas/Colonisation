@@ -1,0 +1,30 @@
+﻿{
+  "oreprocessor": {
+    "categories": [
+      "essential",
+      "decorative"
+    ],
+    "destructionTime": 400,
+    "icon": "./icons/oreprocessor.png",
+    "onPlaceAudio": "woodPlace",
+    "onRemoveAudio": "woodDeleteLight",
+    "sideall": "planks"
+  },
+  "refinedcopper": {
+    "categories": [
+      "essential"
+    ],
+    "icon": "./icons/refinedcopper.png",
+    "isPlaceable": false
+  },
+  "scoutrallypoint": {
+    "categories": [
+      "essential"
+    ],
+    "destructionTime": 100,
+    "icon": "./icons/scoutrallypoint.png",
+    "onPlaceAudio": "woodPlace",
+    "onRemoveAudio": "woodDeleteLight",
+    "sideall": "bricks" 
+  } 
+}

@@ -1,0 +1,30 @@
+﻿[
+  {
+    "name": "colonytech.oreprocessor",
+    "requires": [
+      {
+        "amount": 1,
+        "type": "plank"
+      }
+    ],
+    "results": [
+      {
+        "type": "oreprocessor"
+      }
+    ]
+  },
+  {
+    "name": "colonytech.scoutrallypoint",
+    "requires": [
+      {
+        "amount": 1,
+        "type": "plank"
+      }
+    ],
+    "results": [
+      {
+        "type": "scoutrallypoint" 
+      }
+    ] 
+  }
+]

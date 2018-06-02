@@ -6,12 +6,16 @@ using Pipliz.Mods.APIProvider.Jobs;
 using Server.NPCs;
 using UnityEngine;
 
-namespace Magikaas.ColonyTech.BlockNPCs
+namespace ColonyTech.BlockNPCs
 {
+    [ModLoader.ModManager]
     class OreProcessorJob : CraftingJobBase, IBlockJobBase, INPCTypeDefiner
     {
+        public const string JOB_ALIAS = "oreprocessorjob";
+        public const string JOB_STATION = "oreprocessor";
+        public const string JOB_RECIPE = OreProcessorJob.JOB_STATION + ".recipe";
+
         public static float StaticCraftingCooldown = 10.0f;
-        protected Vector3Int NPCOffset;
 
         public override int MaxRecipeCraftsPerHaul
         {
@@ -26,98 +30,7 @@ namespace Magikaas.ColonyTech.BlockNPCs
 
         public override string NPCTypeKey
         {
-            get { return "colonytech.oreprocessor"; }
-        }
-
-        public override Vector3Int GetJobLocation()
-        {
-            return base.GetJobLocation() + NPCOffset;
-        }
-
-        public override void OnStartCrafting()
-        {
-            base.OnStartCrafting();
-
-            ushort litType;
-            if (worldType == TechBlocks.OreProcessorOffXP)
-            {
-                litType = TechBlocks.OreProcessorOnXP;
-            } else if (worldType == TechBlocks.OreProcessorOffXN)
-            {
-                litType = TechBlocks.OreProcessorOnXN;
-            } else if (worldType == TechBlocks.OreProcessorOffZP)
-            {
-                litType = TechBlocks.OreProcessorOnZP;
-            } else if (worldType == TechBlocks.OreProcessorOffZN)
-            {
-                litType = TechBlocks.OreProcessorOnZN;
-            }
-            else
-            {
-                CheckWorldType();
-                return;
-            }
-
-            if (ServerManager.TryChangeBlock(position, litType))
-            {
-                worldType = litType;
-            }
-        }
-
-        public override void OnStopCrafting ()
-        {
-            base.OnStartCrafting();
-
-            ushort litType;
-            if (worldType == TechBlocks.OreProcessorOnXP)
-            {
-                litType = TechBlocks.OreProcessorOffXP;
-            }
-            else if (worldType == TechBlocks.OreProcessorOnXN)
-            {
-                litType = TechBlocks.OreProcessorOffXN;
-            }
-            else if (worldType == TechBlocks.OreProcessorOnZP)
-            {
-                litType = TechBlocks.OreProcessorOffZP;
-            }
-            else if (worldType == TechBlocks.OreProcessorOnZN)
-            {
-                litType = TechBlocks.OreProcessorOffZN;
-            }
-            else
-            {
-                CheckWorldType();
-                return;
-            }
-
-            if (ServerManager.TryChangeBlock(position, litType))
-            {
-                worldType = litType;
-            }
-        }
-
-        protected override bool IsValidWorldType(ushort type)
-        {
-            if (type == TechBlocks.OreProcessorOffXP || type == TechBlocks.OreProcessorOnXP)
-            {
-                NPCOffset = new Vector3Int(1, 0, 0);
-            } else if (type == TechBlocks.OreProcessorOffXN || type == TechBlocks.OreProcessorOnXN)
-            {
-                NPCOffset = new Vector3Int(-1, 0, 0);
-            } else if (type == TechBlocks.OreProcessorOffZP || type == TechBlocks.OreProcessorOnZP)
-            {
-                NPCOffset = new Vector3Int(0, 0, 1);
-            } else if (type == TechBlocks.OreProcessorOffZN || type == TechBlocks.OreProcessorOnZN)
-            {
-                NPCOffset = new Vector3Int(0, 0, -1);
-            }
-            else
-            {
-                return false;
-            }
-
-            return true;
+            get { return "colonytech.oreprocessorjob"; }
         }
 
         NPCTypeStandardSettings INPCTypeDefiner.GetNPCTypeDefinition()
@@ -130,6 +43,11 @@ namespace Magikaas.ColonyTech.BlockNPCs
                 type = NPCTypeID.GetNextID(),
                 inventoryCapacity = 10
             };
+        }
+
+        protected override bool IsValidWorldType(ushort type)
+        {
+            return (int) type == (int) TechBlocks.OreProcessor;
         }
     }
 }
