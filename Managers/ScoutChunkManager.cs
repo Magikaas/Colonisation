@@ -30,7 +30,12 @@ namespace ColonyTech.Managers
 
         public bool hasChunk(Chunk chunk)
         {
-            return this.chunks.Contains(chunk);
+            return instance.chunks.Contains(chunk);
+        }
+
+        public List<Chunk> getManagedChunks()
+        {
+            return instance.chunks;
         }
 
         public static void RegisterChunkScouted(Chunk chunk)

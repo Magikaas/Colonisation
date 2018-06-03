@@ -1,13 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using BlockTypes.Builtin;
 using ColonyTech.Classes;
 using ColonyTech.BlockNPCs;
-using ColonyTech.Managers;
-using PhentrixGames.NewColonyAPI.Helpers;
 using PhentrixGames.NewColonyAPI;
+using PhentrixGames.NewColonyAPI.Helpers;
 using Pipliz.Mods.APIProvider.Jobs;
 
 namespace ColonyTech.Jobs
@@ -30,14 +27,15 @@ namespace ColonyTech.Jobs
 
             LocalizationFolder = Path.Combine(ModGameDataDirectory, "localization/").Replace("\\", "/");
             Utilities.CreateLogs("ColonyTech");
-            PhentrixGames.NewColonyAPI.Managers.ConfigManager.registerConfig("Magikaas/ColonyTech", "config");
+            PhentrixGames.NewColonyAPI.Managers.ConfigManager.RegisterConfig("ColonyTech", "Magikaas/ColonyTech");
         }
 
         [ModLoader.ModCallback(ModLoader.EModCallbackType.AfterStartup, Naming + "AfterStartup")]
         public static void AfterStartup()
         {
             string versionURL = "https://raw.githubusercontent.com/Magikaas/ColonyTech/master/ColonyTech.md";
-            string version1 = new WebClient().DownloadString(versionURL);
+
+            PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("ColonyTech", "Modname: " + ModName + ". ModFolder: " + ModFolder + ". Config: " + ModFolder + "/config. VersionURL: " + versionURL);
             
             PhentrixGames.NewColonyAPI.Managers.ModManager.RegisterMod(ModName, ModFolder, ModVersion, ModFolder + "/config", versionURL);
         }

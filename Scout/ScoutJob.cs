@@ -2,6 +2,7 @@
 using BlockTypes.Builtin;
 using ColonyTech.Managers;
 using NPC;
+using PhentrixGames.NewColonyAPI.Commands;
 using Pipliz;
 using Pipliz.Mods.APIProvider.Jobs;
 using Server.AI;
@@ -24,14 +25,6 @@ namespace ColonyTech.Classes
             Excellent
         }
 
-        public enum ScoutDirection
-        {
-            NORTH,
-            EAST,
-            SOUTH,
-            WEST
-        }
-
         public const string JOB_ALIAS = "scoutjob";
         public const string JOB_STATION = "scoutrallypoint";
 
@@ -42,12 +35,12 @@ namespace ColonyTech.Classes
         //Amount of chunks away from scout to check for suitability (0 = own chunk, 1 = 3x3, 2 = 5x5, etc...)
         private int ChunkCheckRange = 1;
 
+        private int MinChunkScoutRange = 2;
+
         //Max range from scout rally point to scout, to avoid NPCs going too far away from the base
         private int MaxChunkScoutRange = 10;
 
         public override string NPCTypeKey => "colonytech." + JOB_STATION;
-
-        public ScoutDirection Direction;
 
         private ScoutChunkManager getScoutChunkManager()
         {
@@ -57,28 +50,6 @@ namespace ColonyTech.Classes
         public ITrackableBlock InitializeOnAdd(Vector3Int position, ushort type, Players.Player player)
         {
             InitializeJob(player, position, 0);
-
-            int randomDirection = Random.Next(0, 3);
-
-            switch (randomDirection)
-            {
-                case 0:
-                    this.Direction = ScoutDirection.NORTH;
-                    break;
-                case 1:
-                    this.Direction = ScoutDirection.EAST;
-                    break;
-                case 2:
-                    this.Direction = ScoutDirection.SOUTH;
-                    break;
-                case 3:
-                    this.Direction = ScoutDirection.WEST;
-                    break;
-                default:
-                    this.Direction = ScoutDirection.NORTH;
-                    break;
-            }
-
             return this;
         }
 
@@ -88,35 +59,42 @@ namespace ColonyTech.Classes
             //Always return Job, we can determine the jobLocation based on the time
             return NPCBase.NPCGoal.Job;
         }
-        
-        public Vector3Int findClosestUnscoutedChunk()
-        {
-            var chunkManager = getScoutChunkManager();
 
+        #region ChunkFinding
+        public bool findClosestUnscoutedChunk(out Vector3Int output)
+        {
             int xStart = this.NPC.Position.x;
             int y = this.NPC.Position.y;
             int zStart = this.NPC.Position.z;
 
+            bool chunkFound = false;
+
+            output = KeyLocation;
+
             Vector3Int checkedPosition = new Vector3Int(xStart, y, zStart);
 
-            for (int distance = 1; distance < this.MaxChunkScoutRange; distance++)
+            for (int distance = 16; distance < this.MaxChunkScoutRange * 16; distance += 16)
             {
-                for (var i = 0; i < distance + 1; i++)
+                for (var i = 0; i < distance + 16; i += 16)
                 {
-                    int x1 = xStart - distance + 1;
+                    int x1 = xStart - distance + i;
                     int z1 = zStart - i;
 
-                    if (ChunkManagerHasChunkAt(x1, 0, z1, out checkedPosition))
+                    if (!ChunkManagerHasChunkAt(x1, y, z1, out checkedPosition))
                     {
-                        return checkedPosition.ToChunk();
+                        output = checkedPosition.ToChunk();
+                        chunkFound = true;
+                        break;
                     }
 
                     int x2 = xStart + distance - 1;
                     int z2 = zStart + i;
 
-                    if (ChunkManagerHasChunkAt(x2, 0, z2, out checkedPosition))
+                    if (!ChunkManagerHasChunkAt(x2, y, z2, out checkedPosition))
                     {
-                        return checkedPosition.ToChunk();
+                        output = checkedPosition.ToChunk();
+                        chunkFound = true;
+                        break;
                     }
                 }
 
@@ -125,32 +103,98 @@ namespace ColonyTech.Classes
                     int x1 = xStart - i;
                     int z1 = zStart + distance - i;
 
-                    if (ChunkManagerHasChunkAt(x1, 0, z1, out checkedPosition))
+                    if (!ChunkManagerHasChunkAt(x1, y, z1, out checkedPosition))
                     {
-                        return checkedPosition.ToChunk();
+                        output = checkedPosition.ToChunk();
+                        chunkFound = true;
+                        break;
                     }
 
                     int x2 = xStart + distance -i;
                     int z2 = zStart - i;
 
-                    if (ChunkManagerHasChunkAt(x2, 0, z2, out checkedPosition))
+                    if (!ChunkManagerHasChunkAt(x2, y, z2, out checkedPosition))
                     {
-                        return checkedPosition.ToChunk();
+                        output = checkedPosition.ToChunk();
+                        chunkFound = true;
+                        break;
+                    }
+                }
+
+                if (chunkFound)
+                {
+                    Log.Write("Closest unscouted chunk: " + output.ToString());
+                    return true;
+                }
+            }
+
+            Log.Write("Unable to find unscouted chunk.");
+
+            output = Vector3Int.invalidPos;
+            return false;
+        }
+
+        public Vector3Int TryGetGroundLevelPosition(Vector3Int position)
+        {
+            int x = position.x;
+            int z = position.z;
+
+            for (var y = 0; y < 200; y++)
+            {
+                Vector3Int positionToCheck = new Vector3Int(x, y, z);
+                if (World.TryGetTypeAt(new Vector3Int(x, y, z), out ushort type))
+                {
+                    bool result = false;
+                    if (type == 0 || World.TryIsSolid(positionToCheck, out result))
+                    {
+                        if(!result)
+                            return positionToCheck;
                     }
                 }
             }
 
-            return checkedPosition;
+            return KeyLocation;
         }
 
-        public bool ChunkManagerHasChunkAt(int x, int y, int z, out Vector3Int currentCheckedPosition)
+        public bool ChunkManagerHasChunkAt(int x, int y, int z, out Vector3Int targetPosition)
         {
-            currentCheckedPosition = new Vector3Int(x, y, z);
+            Vector3Int currentCheckedPosition = new Vector3Int(x, y, z);
 
-            return !getScoutChunkManager().hasChunk(World.GetChunk(currentCheckedPosition));
+            Chunk c = new Chunk(currentCheckedPosition);
+
+            targetPosition = TryGetGroundLevelPosition(currentCheckedPosition);
+
+            return getScoutChunkManager().hasChunk(World.GetChunk(currentCheckedPosition));
         }
 
-        //
+        public bool IsChunkInScoutingRange(Chunk chunk, ITrackableBlock banner)
+        {
+            return IsPositionInScoutingRange(chunk.Position, banner);
+        }
+
+        public bool IsPositionInScoutingRange(Vector3Int position, ITrackableBlock banner)
+        {
+            return IsWithinXChunksOf(banner.KeyLocation, position.ToChunk(), MaxChunkScoutRange);
+        }
+
+        public bool IsWithinXChunksOf(Vector3Int origin, Vector3Int destination, int chunkRangeX, int chunkRangeY = -1)
+        {
+            //Added in case the chunkrange is not a perfect square
+            if (chunkRangeY == -1)
+            {
+                chunkRangeY = chunkRangeX;
+            }
+
+            bool isWithinXRange = (destination.ToChunk().x <= origin.ToChunk().x + (chunkRangeX * 16)) &&
+                                  (destination.ToChunk().x >= origin.ToChunk().x - (chunkRangeX * 16));
+
+            bool isWithinYRange = (destination.ToChunk().y <= origin.ToChunk().y + (chunkRangeY * 16)) &&
+                                  (destination.ToChunk().y >= origin.ToChunk().y - (chunkRangeY * 16));
+
+            return isWithinXRange && isWithinYRange;
+        }
+        #endregion
+
         public override Vector3Int GetJobLocation()
         {
             Log.Write("GetJobLocation");
@@ -160,13 +204,18 @@ namespace ColonyTech.Classes
                 Log.Write("Not stocked up");
                 return KeyLocation;
             }
+            else
+            {
+                Log.Write("Stocked up!");
+            }
 
             //If it's almost sunset, don't move, NPC will start preparing base for the night
-            if (TimeCycle.TimeTillSunSet < 10) return NPC.Position;
-            bool goodGoalPositionFound = false;
+            if ((TimeCycle.TimeTillSunSet * TimeCycle.variables.RealSecondsPerIngameHour) < 10)
+            {
+                return NPC.Position;
+            }
 
-            var targetLocation = NPC.Position;
-
+            /*
             while (!goodGoalPositionFound)
             {
                 var myPos = NPC.Position;
@@ -193,9 +242,7 @@ namespace ColonyTech.Classes
                                            foundType == BuiltinBlocks.LogTemperate &&
                                            foundType == BuiltinBlocks.LogTaiga);
 
-                        bool isSolid = false;
-
-                        World.TryIsSolid(tryTargetLocation, out isSolid);
+                        World.TryIsSolid(tryTargetLocation, out bool isSolid);
 
                         //Make sure we're not climbing a tree
                         if (foundType != 0 && !typeIsTree && isSolid)
@@ -213,10 +260,30 @@ namespace ColonyTech.Classes
                     goodGoalPositionFound = true;
                 }
             }
+            */
 
-            Log.Write(targetLocation.ToString());
+            if (this.findClosestUnscoutedChunk(out Vector3Int targetLocation))
+            {
+                Log.Write("Closest Chunk found: " + targetLocation.ToString());
+                return targetLocation;
+            }
+            else
+            {
+                Log.Write("Nothing to scout found.");
+                return KeyLocation;
+            }
+        }
 
-            return targetLocation;
+        public bool IsOutsideMinimumRange(Vector3Int position, ITrackableBlock banner)
+        {
+            if ((position.x > (banner.KeyLocation.x + (MinChunkScoutRange * 16)) ||
+                 position.x < (banner.KeyLocation.x - (MinChunkScoutRange * 16))) &&
+                (position.y > (banner.KeyLocation.y + (MinChunkScoutRange * 16)) ||
+                 position.y < (banner.KeyLocation.y - (MinChunkScoutRange * 16))))
+            {
+                return true;
+            }
+            return false;
         }
 
         public override void OnNPCAtJob(ref NPCBase.NPCState state)
@@ -224,9 +291,22 @@ namespace ColonyTech.Classes
             state.SetCooldown(2);
             Log.Write("OnNPCAtJob");
 
+            int test = 200;
+
+            sbyte a = (sbyte)test;
+
+            int testtwo = (int) a;
+
+            Log.Write("Int: " + test + " | Sbyte: " + a + " | Int: " + testtwo);
+
             if (!StockedUp) StockedUp = true;
 
             var commenceBaseBuild = false;
+
+            if (!IsOutsideMinimumRange(NPC.Position, BannerTracker.Get(NPC.Colony.Owner)))
+            {
+                return;
+            }
 
             //Check the surrounding area and calculate its average flatness, to determine if it's suitable for a base
             var suitability = calculateAreaSuitability();
