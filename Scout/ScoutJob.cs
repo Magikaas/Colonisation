@@ -61,7 +61,7 @@ namespace ColonyTech.Classes
         }
 
         #region ChunkFinding
-        public bool findClosestUnscoutedChunk(out Vector3Int output)
+        public bool findClosestUnscoutedChunk(out Vector3Int checkedPosition)
         {
             int xStart = this.NPC.Position.x;
             int y = this.NPC.Position.y;
@@ -69,9 +69,9 @@ namespace ColonyTech.Classes
 
             bool chunkFound = false;
 
-            output = KeyLocation;
+            Vector3Int output = KeyLocation;
 
-            Vector3Int checkedPosition = new Vector3Int(xStart, y, zStart);
+            checkedPosition = new Vector3Int(xStart, y, zStart);
 
             for (int distance = 16; distance < this.MaxChunkScoutRange * 16; distance += 16)
             {
@@ -139,13 +139,13 @@ namespace ColonyTech.Classes
             int x = position.x;
             int z = position.z;
 
-            for (var y = 0; y < 200; y++)
+            for (var y = 55; y < 200; y++)
             {
                 Vector3Int positionToCheck = new Vector3Int(x, y, z);
                 if (World.TryGetTypeAt(new Vector3Int(x, y, z), out ushort type))
                 {
                     bool result = false;
-                    if (type == 0 || World.TryIsSolid(positionToCheck, out result))
+                    if (type == 0 || !World.TryIsSolid(positionToCheck, out result))
                     {
                         if(!result)
                             return positionToCheck;
@@ -162,7 +162,19 @@ namespace ColonyTech.Classes
 
             Chunk c = new Chunk(currentCheckedPosition);
 
+            Vector3Byte currentCheckedPositionVector3Byte = currentCheckedPosition.ToChunkLocal();
+
+            currentCheckedPosition.x += currentCheckedPositionVector3Byte.x;
+            currentCheckedPosition.y += currentCheckedPositionVector3Byte.y;
+            currentCheckedPosition.z += currentCheckedPositionVector3Byte.z;
+
             targetPosition = TryGetGroundLevelPosition(currentCheckedPosition);
+
+            Log.Write("CurrentCheckedPosition:" + currentCheckedPosition.ToString());
+
+            Log.Write("CurrentCheckedPositionByte: " + currentCheckedPositionVector3Byte.ToString());
+
+            Log.Write("TargetPosition:" + targetPosition.ToString());
 
             return getScoutChunkManager().hasChunk(World.GetChunk(currentCheckedPosition));
         }
@@ -179,7 +191,7 @@ namespace ColonyTech.Classes
 
         public bool IsWithinXChunksOf(Vector3Int origin, Vector3Int destination, int chunkRangeX, int chunkRangeY = -1)
         {
-            //Added in case the chunkrange is not a perfect square
+            //Added in case the chunkrange is not a perfect square 
             if (chunkRangeY == -1)
             {
                 chunkRangeY = chunkRangeX;

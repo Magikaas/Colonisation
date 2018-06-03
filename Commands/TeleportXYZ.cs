@@ -23,7 +23,7 @@ namespace ColonyTech.Commands
 
             if (Players.TryMatchName(argsArray[1], out targetPlayer))
             {
-                //Pipliz.Log.Write("No player found for name {" + argsArray[0] + "}");
+                Pipliz.Log.Write("No player found for name {" + argsArray[1] + "}");
                 return false;
             }
 
@@ -31,6 +31,7 @@ namespace ColonyTech.Commands
                 !int.TryParse(argsArray[3], out int y) ||
                 !int.TryParse(argsArray[4], out int z))
             {
+                Pipliz.Log.Write("Invalid coordinates");
                 return false;
             }
 

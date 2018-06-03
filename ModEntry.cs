@@ -22,7 +22,7 @@ namespace ColonyTech.Jobs
         [ModLoader.ModCallback(ModLoader.EModCallbackType.OnAssemblyLoaded, Naming + "OnAssemblyLoaded")]
         public static void OnAssemblyLoaded(string path)
         {
-            ModFolder = Path.GetDirectoryName(path);
+            ModFolder = Path.GetDirectoryName(path).Replace("\\", "/");
             ModGameDataDirectory = Path.Combine(Path.GetDirectoryName(path), "gamedata/").Replace("\\", "/");
 
             LocalizationFolder = Path.Combine(ModGameDataDirectory, "localization/").Replace("\\", "/");
@@ -37,7 +37,7 @@ namespace ColonyTech.Jobs
 
             PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("ColonyTech", "Modname: " + ModName + ". ModFolder: " + ModFolder + ". Config: " + ModFolder + "/config. VersionURL: " + versionURL);
             
-            PhentrixGames.NewColonyAPI.Managers.ModManager.RegisterMod(ModName, ModFolder, ModVersion, ModFolder + "/config", versionURL);
+            PhentrixGames.NewColonyAPI.Managers.ModManager.RegisterMod(ModName, ModFolder, ModVersion, ModFolder + "/config");
         }
 
         [ModLoader.ModCallback(ModLoader.EModCallbackType.AfterItemTypesDefined, Naming + "RegisterJobs")]
