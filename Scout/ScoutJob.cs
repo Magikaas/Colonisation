@@ -55,7 +55,8 @@ namespace ColonyTech.Classes
 
         public override NPCBase.NPCGoal CalculateGoal(ref NPCBase.NPCState state)
         {
-            Log.Write("CalculateGoal");
+            WriteLog("CalculateGoal");
+
             //Always return Job, we can determine the jobLocation based on the time
             return NPCBase.NPCGoal.Job;
         }
@@ -123,12 +124,12 @@ namespace ColonyTech.Classes
 
                 if (chunkFound)
                 {
-                    Log.Write("Closest unscouted chunk: " + output.ToString());
+                    WriteLog("Closest unscouted chunk: " + output.ToString());
                     return true;
                 }
             }
 
-            Log.Write("Unable to find unscouted chunk.");
+            WriteLog("Unable to find unscouted chunk.");
 
             output = Vector3Int.invalidPos;
             return false;
@@ -142,12 +143,12 @@ namespace ColonyTech.Classes
             for (var y = 55; y < 200; y++)
             {
                 Vector3Int positionToCheck = new Vector3Int(x, y, z);
-                if (World.TryGetTypeAt(new Vector3Int(x, y, z), out ushort type))
+                if (World.TryGetTypeAt(positionToCheck, out ushort type))
                 {
                     bool result = false;
                     if (type == 0 || !World.TryIsSolid(positionToCheck, out result))
                     {
-                        if(!result)
+                        if (!result)
                             return positionToCheck;
                     }
                 }
@@ -170,11 +171,11 @@ namespace ColonyTech.Classes
 
             targetPosition = TryGetGroundLevelPosition(currentCheckedPosition);
 
-            Log.Write("CurrentCheckedPosition:" + currentCheckedPosition.ToString());
+            WriteLog("CurrentCheckedPosition:" + currentCheckedPosition.ToString());
 
-            Log.Write("CurrentCheckedPositionByte: " + currentCheckedPositionVector3Byte.ToString());
+            WriteLog("CurrentCheckedPositionByte: " + currentCheckedPositionVector3Byte.ToString());
 
-            Log.Write("TargetPosition:" + targetPosition.ToString());
+            WriteLog("TargetPosition:" + targetPosition.ToString());
 
             return getScoutChunkManager().hasChunk(World.GetChunk(currentCheckedPosition));
         }
@@ -209,16 +210,12 @@ namespace ColonyTech.Classes
 
         public override Vector3Int GetJobLocation()
         {
-            Log.Write("GetJobLocation");
+            WriteLog("GetJobLocation");
             if (!StockedUp)
             {
                 if (!worldTypeChecked) CheckWorldType();
-                Log.Write("Not stocked up");
+                WriteLog("Not stocked up");
                 return KeyLocation;
-            }
-            else
-            {
-                Log.Write("Stocked up!");
             }
 
             //If it's almost sunset, don't move, NPC will start preparing base for the night
@@ -276,12 +273,15 @@ namespace ColonyTech.Classes
 
             if (this.findClosestUnscoutedChunk(out Vector3Int targetLocation))
             {
-                Log.Write("Closest Chunk found: " + targetLocation.ToString());
+                WriteLog("Closest Chunk found: " + targetLocation.ToString());
+
+                createPlatformUnder(targetLocation, BuiltinBlocks.BricksBlack);
+
                 return targetLocation;
             }
             else
             {
-                Log.Write("Nothing to scout found.");
+                WriteLog("Nothing to scout found.");
                 return KeyLocation;
             }
         }
@@ -301,15 +301,13 @@ namespace ColonyTech.Classes
         public override void OnNPCAtJob(ref NPCBase.NPCState state)
         {
             state.SetCooldown(2);
-            Log.Write("OnNPCAtJob");
 
-            int test = 200;
+            Vector3Int belowNPC = new Vector3Int(NPC.Position.x, NPC.Position.y - 1, NPC.Position.z);
+            WriteLog(belowNPC.ToString());
+            WriteLog(KeyLocation.ToString());
 
-            sbyte a = (sbyte)test;
-
-            int testtwo = (int) a;
-
-            Log.Write("Int: " + test + " | Sbyte: " + a + " | Int: " + testtwo);
+            World.SetTypeAt(belowNPC, BuiltinBlocks.Bricks);
+            WriteLog("OnNPCAtJob");
 
             if (!StockedUp) StockedUp = true;
 
@@ -332,7 +330,7 @@ namespace ColonyTech.Classes
                 case Suitability.Decent:
                     break;
                 case Suitability.Good:
-                    Log.Write("Suitable location found for new base.");
+                    WriteLog("Suitable location found for new base.");
                     commenceBaseBuild = true;
                     break;
                 case Suitability.Excellent:
@@ -349,6 +347,18 @@ namespace ColonyTech.Classes
         public override void OnNPCAtStockpile(ref NPCBase.NPCState state)
         {
             state.SetCooldown(0.5);
+        }
+
+        public void createPlatformUnder(Vector3Int position, ushort type)
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                for (var j = 0; j < 3; j++)
+                {
+                    Vector3Int pos = new Vector3Int(position.x-2+i, position.y-1, position.z-2+j);
+                    World.SetTypeAt(pos, type);
+                }
+            }
         }
 
         NPCTypeStandardSettings INPCTypeDefiner.GetNPCTypeDefinition()
@@ -414,15 +424,20 @@ namespace ColonyTech.Classes
 
         private void RecordHeight(int x, int y, int z)
         {
-            //Pipliz.Log.Write("X: {0}. Y: {1}. Z: {2}", x, y, z);
             var index = (x + ChunkCheckRange) * ChunkCheckRange + z + ChunkCheckRange;
-            //Pipliz.Log.Write("Index to write to: " + index);
+
             heightsTable[index] = new RecordedHeight(x, y, z);
         }
 
         protected override bool IsValidWorldType(ushort type)
         {
             return type == GeneralBlocks.ScoutRallyPoint;
+        }
+
+        protected void WriteLog(string message)
+        {
+            if(Globals.DebugMode)
+                Log.Write(message);
         }
     }
 
