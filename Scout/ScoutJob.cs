@@ -100,6 +100,7 @@ namespace ColonyTech.Classes
 
             for (int distance = 16; distance < this.MaxChunkScoutRange * 16; distance += 16)
             {
+                WriteLog("Distance: " + distance);
                 for (var i = 0; i < distance + 16; i += 16)
                 {
                     rememberI = i;
@@ -108,6 +109,9 @@ namespace ColonyTech.Classes
 
                     x1 -= x1 % 16;
                     z1 -= z1 % 16;
+
+                    WriteLog("Coords to check: ");
+                    WriteLog("X: " + x1 + ". Y: " + y + ", Z: " + z1);
 
                     if (!ChunkManagerHasChunkAt(x1, y, z1, out checkedPosition))
                     {
@@ -121,6 +125,9 @@ namespace ColonyTech.Classes
 
                     x2 -= x2 % 16;
                     z2 -= z2 % 16;
+
+                    WriteLog("Coords to check: ");
+                    WriteLog("X: " + x2 + ". Y: " + y + ", Z: " + z2);
 
                     if (!ChunkManagerHasChunkAt(x2, y, z2, out checkedPosition))
                     {
@@ -139,6 +146,9 @@ namespace ColonyTech.Classes
                     x1 -= x1 % 16;
                     z1 -= z1 % 16;
 
+                    WriteLog("Coords to check: ");
+                    WriteLog("X: " + x1 + ". Y: " + y + ", Z: " + z1);
+
                     if (!ChunkManagerHasChunkAt(x1, y, z1, out checkedPosition))
                     {
                         output = checkedPosition.ToChunk();
@@ -151,6 +161,9 @@ namespace ColonyTech.Classes
 
                     x2 -= x2 % 16;
                     z2 -= z2 % 16;
+
+                    WriteLog("Coords to check: ");
+                    WriteLog("X: " + x2 + ". Y: " + y + ", Z: " + z2);
 
                     if (!ChunkManagerHasChunkAt(x2, y, z2, out checkedPosition))
                     {
@@ -211,6 +224,14 @@ namespace ColonyTech.Classes
             currentCheckedPosition.x += currentCheckedPositionVector3Byte.x;
             currentCheckedPosition.y += currentCheckedPositionVector3Byte.y;
             currentCheckedPosition.z += currentCheckedPositionVector3Byte.z;
+
+            WriteLog("Check for: " + currentCheckedPosition.ToString());
+
+            WriteLog("Amount of managed chunks: " + getScoutChunkManager().getManagedChunks().Count);
+
+            Chunk[] chunkArray = getScoutChunkManager().getManagedChunks().ToArray();
+
+            WriteLog(chunkArray.ToString());
 
             targetPosition = TryGetGroundLevelPosition(currentCheckedPosition);
 
