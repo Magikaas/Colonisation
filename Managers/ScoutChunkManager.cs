@@ -38,7 +38,7 @@ namespace ColonyTech.Managers
             return instance.chunks;
         }
 
-        public static void RegisterChunkScouted(Chunk chunk)
+        public void RegisterChunkScouted(Chunk chunk)
         {
             if (!instance.hasChunk(chunk))
             {
