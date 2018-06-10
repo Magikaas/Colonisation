@@ -1,15 +1,12 @@
-﻿using System;
-using BlockTypes.Builtin;
+﻿using BlockTypes.Builtin;
 using ColonyTech.Managers;
 using NPC;
-using PhentrixGames.NewColonyAPI.Commands;
 using Pipliz;
 using Pipliz.Mods.APIProvider.Jobs;
 using Server.AI;
 using Server.NPCs;
 using UnityEngine;
 using Math = Pipliz.Math;
-using Random = Pipliz.Random;
 
 namespace ColonyTech.Classes
 {
@@ -66,13 +63,13 @@ namespace ColonyTech.Classes
         public ITrackableBlock InitializeOnAdd(Vector3Int position, ushort type, Players.Player player)
         {
             InitializeJob(player, position, 0);
-            Activity = ScoutActivity.None;
+            SetActivity(ScoutActivity.None);
             return this;
         }
 
         public override NPCBase.NPCGoal CalculateGoal(ref NPCBase.NPCState state)
         {
-            WriteLog("CalculateGoal");
+            //WriteLog("CalculateGoal");
 
             //Always return Job, we can determine the jobLocation based on the time
             return NPCBase.NPCGoal.Job;
@@ -84,103 +81,114 @@ namespace ColonyTech.Classes
         }
 
         #region ChunkFinding
+
+        private bool increaseSteps = true;
+        private int stepAmount = 0, stepIncrease = 16, modifier = 1;
+
+        private int pathingX = 0, pathingZ = 0;
+
+        private enum PathingState
+        {
+            Started,
+            Turning,
+            Stepping,
+            IncreaseSteps
+        }
+
+        private int steppingProgress = 0;
+
+        private PathingState PathState = PathingState.Started;
+
         public bool findClosestUnscoutedChunk(out Vector3Int checkedPosition)
         {
-            int xStart = GetScoutBanner().KeyLocation.x;
-            int y = GetScoutBanner().KeyLocation.y;
-            int zStart = GetScoutBanner().KeyLocation.z;
-
-            bool chunkFound = false;
-
             Vector3Int output = KeyLocation;
 
-            checkedPosition = new Vector3Int(xStart, y, zStart);
+            int y = 64;
 
-            int rememberI = 0;
-
-            for (int distance = 16; distance < this.MaxChunkScoutRange * 16; distance += 16)
+            if(PathState == PathingState.Started)
             {
-                WriteLog("Distance: " + distance);
-                for (var i = 0; i < distance + 16; i += 16)
+                this.pathingX = GetScoutBanner().KeyLocation.x;
+                this.pathingZ = GetScoutBanner().KeyLocation.z;
+            }
+
+            int xStart = this.pathingX, zStart = this.pathingZ;
+
+            checkedPosition = new Vector3Int(this.pathingX, y, this.pathingZ);
+
+            if (!AIManager.TryGetClosestAIPosition(checkedPosition, AIManager.EAIClosestPositionSearchType.ChunkAndDirectNeighbours,
+                out checkedPosition))
+            {
+                WriteLog("Can't find AI position");
+                WriteLog(checkedPosition.ToString());
+                return false;
+            }
+
+            if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
+            {
+                WriteLog("Found before searching!");
+                return true;
+            }
+
+            while (CoordWithinBounds(this.pathingX, this.pathingZ, xStart, zStart, MaxChunkScoutRange * 16))
+            {
+                //Only increase steps if we are in the correct state, since we start here every time we come back
+                //To avoid accidentally increasing stepAmount every time we look for unscouted chunks
+                if (PathState == PathingState.IncreaseSteps)
                 {
-                    rememberI = i;
-                    int x1 = xStart - distance + i;
-                    int z1 = zStart - i;
-
-                    x1 -= x1 % 16;
-                    z1 -= z1 % 16;
-
-                    WriteLog("Coords to check: ");
-                    WriteLog("X: " + x1 + ". Y: " + y + ", Z: " + z1);
-
-                    if (!ChunkManagerHasChunkAt(x1, y, z1, out checkedPosition))
+                    if (increaseSteps)
                     {
-                        output = checkedPosition.ToChunk();
-                        chunkFound = true;
-                        break;
+                        stepAmount += stepIncrease;
+                        modifier *= -1;
                     }
 
-                    int x2 = xStart + distance - 1;
-                    int z2 = zStart + i;
+                    PathState = PathingState.Stepping;
+                }
 
-                    x2 -= x2 % 16;
-                    z2 -= z2 % 16;
-
-                    WriteLog("Coords to check: ");
-                    WriteLog("X: " + x2 + ". Y: " + y + ", Z: " + z2);
-
-                    if (!ChunkManagerHasChunkAt(x2, y, z2, out checkedPosition))
+                if (increaseSteps)
+                {
+                    PathState = PathingState.Stepping;
+                    for (int i = steppingProgress; i < stepAmount; i += 16)
                     {
-                        output = checkedPosition.ToChunk();
-                        chunkFound = true;
-                        break;
+                        this.pathingX += modifier;
+                        if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
+                        {
+                            break;
+                        }
+                    }
+
+                    steppingProgress = 0;
+
+                    PathState = PathingState.Turning;
+                }
+                else
+                {
+                    PathState = PathingState.Stepping;
+                    for (int i = steppingProgress; i < stepAmount; i += 16)
+                    {
+                        this.pathingZ += modifier;
+                        if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
+                        {
+                            break;
+                        }
+                    }
+
+                    steppingProgress = 0;
+
+                    PathState = PathingState.Turning;
+                }
+
+                if (PathState == PathingState.Turning)
+                {
+                    increaseSteps = !increaseSteps;
+                    if (increaseSteps)
+                    {
+                        PathState = PathingState.IncreaseSteps;
                     }
                 }
 
-                for (var i = 1; i < distance; i++)
+                if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
                 {
-                    rememberI = i;
-                    int x1 = xStart - i;
-                    int z1 = zStart + distance - i;
-
-                    x1 -= x1 % 16;
-                    z1 -= z1 % 16;
-
-                    WriteLog("Coords to check: ");
-                    WriteLog("X: " + x1 + ". Y: " + y + ", Z: " + z1);
-
-                    if (!ChunkManagerHasChunkAt(x1, y, z1, out checkedPosition))
-                    {
-                        output = checkedPosition.ToChunk();
-                        chunkFound = true;
-                        break;
-                    }
-
-                    int x2 = xStart + distance -i;
-                    int z2 = zStart - i;
-
-                    x2 -= x2 % 16;
-                    z2 -= z2 % 16;
-
-                    WriteLog("Coords to check: ");
-                    WriteLog("X: " + x2 + ". Y: " + y + ", Z: " + z2);
-
-                    if (!ChunkManagerHasChunkAt(x2, y, z2, out checkedPosition))
-                    {
-                        output = checkedPosition.ToChunk();
-                        chunkFound = true;
-                        break;
-                    }
-                }
-
-                if (chunkFound)
-                {
-                    if (IsOutsideMinimumRange(checkedPosition, GetScoutBanner()))
-                    {
-                        continue;
-                    }
-                    //WriteLog("Closest unscouted chunk: " + output.ToString());
-                    WriteLog("Distance: " + distance + ". I: " + rememberI);
+                    WriteLog((pathingX - GetScoutBanner().KeyLocation.x) + ", " + (pathingZ - GetScoutBanner().KeyLocation.z));
                     return true;
                 }
             }
@@ -191,51 +199,27 @@ namespace ColonyTech.Classes
             return false;
         }
 
-        public Vector3Int TryGetGroundLevelPosition(Vector3Int position)
+        private bool CoordWithinBounds(int x, int z, int xStart, int zStart, int MaxRange)
         {
-            int x = position.x;
-            int z = position.z;
+            bool InXRange = (x > (xStart - MaxRange)) && (x < (xStart + MaxRange));
+            bool InZRange = (z > (zStart - MaxRange)) && (z < (zStart + MaxRange));
 
-            for (var y = 55; y < 200; y++)
-            {
-                Vector3Int positionToCheck = new Vector3Int(x, y, z);
-                if (World.TryGetTypeAt(positionToCheck, out ushort type))
-                {
-                    bool result = false;
-                    if (type == 0 || !World.TryIsSolid(positionToCheck, out result))
-                    {
-                        if (!result)
-                            return positionToCheck;
-                    }
-                }
-            }
+            //WriteLog((x + " > " + (xStart - MaxRange) + ": " + (x > (xStart - MaxRange))) + (z + " > " + (zStart - MaxRange) + ": " + (z > (zStart - MaxRange))));
+            //WriteLog((x + " < " + (xStart + MaxRange) + ": " + (x < (xStart + MaxRange))) + (z + " < " + (zStart + MaxRange) + ": " + (z < (zStart + MaxRange))));
 
-            return KeyLocation;
+            //WriteLog("XRAnge: " + InXRange + ". ZRange: " + InZRange);
+
+            return InXRange && InZRange;
         }
 
         public bool ChunkManagerHasChunkAt(int x, int y, int z, out Vector3Int targetPosition)
         {
-            Vector3Int currentCheckedPosition = new Vector3Int(x, y, z);
+            targetPosition = new Vector3Int(x, y, z).ToChunk();
 
-            Chunk c = new Chunk(currentCheckedPosition);
+            Server.AI.AIManager.TryGetClosestAIPosition(targetPosition,
+                AIManager.EAIClosestPositionSearchType.ChunkAndDirectNeighbours, out targetPosition);
 
-            Vector3Byte currentCheckedPositionVector3Byte = currentCheckedPosition.ToChunkLocal();
-
-            currentCheckedPosition.x += currentCheckedPositionVector3Byte.x;
-            currentCheckedPosition.y += currentCheckedPositionVector3Byte.y;
-            currentCheckedPosition.z += currentCheckedPositionVector3Byte.z;
-
-            WriteLog("Check for: " + currentCheckedPosition.ToString());
-
-            WriteLog("Amount of managed chunks: " + getScoutChunkManager().getManagedChunks().Count);
-
-            Chunk[] chunkArray = getScoutChunkManager().getManagedChunks().ToArray();
-
-            WriteLog(chunkArray.ToString());
-
-            targetPosition = TryGetGroundLevelPosition(currentCheckedPosition);
-
-            return getScoutChunkManager().hasChunk(World.GetChunk(currentCheckedPosition));
+            return getScoutChunkManager().hasPosition(targetPosition);
         }
 
         public bool IsChunkInScoutingRange(Chunk chunk, ITrackableBlock banner)
@@ -268,32 +252,40 @@ namespace ColonyTech.Classes
 
         public override Vector3Int GetJobLocation()
         {
-            WriteLog("GetJobLocation");
             if (!StockedUp)
             {
                 if (!worldTypeChecked) CheckWorldType();
                 WriteLog("Not stocked up");
-                Activity = ScoutActivity.Restocking;
+                SetActivity(ScoutActivity.Restocking);
                 return KeyLocation;
             }
 
             //If it's almost sunset, don't move, NPC will start preparing base for the night
             if ((TimeCycle.TimeTillSunSet * TimeCycle.variables.RealSecondsPerIngameHour) < 10)
             {
-                Activity = ScoutActivity.SetUpCamp;
+                WriteLog("Set up Camp!");
+                SetActivity(ScoutActivity.SetUpCamp);
                 return NPC.Position;
             }
 
             if (Activity == ScoutActivity.Walking)
             {
-                return currentDestination;
+                EPathFindingResult pathFindingResult = AIManager.NPCPathFinder.TryFindPath(NPC.Position, currentDestination, out Path path);
+
+                if (pathFindingResult == EPathFindingResult.Success)
+                {
+                    return currentDestination;
+                }
+                else
+                {
+                    //We can't reach this destination, register it as scouted for now
+                    getScoutChunkManager().RegisterPositionScouted(currentDestination);
+                }
             }
 
             if (this.findClosestUnscoutedChunk(out Vector3Int targetLocation))
             {
                 WriteLog("Closest Chunk found: " + targetLocation.ToString());
-
-                createPlatformUnder(targetLocation, BuiltinBlocks.BricksBlack);
 
                 Activity = ScoutActivity.Walking;
 
@@ -322,6 +314,37 @@ namespace ColonyTech.Classes
 
         public void SetActivity(ScoutActivity Activity)
         {
+            switch (Activity)
+            {
+                case ScoutActivity.Eating:
+                    WriteLog("State: Eating");
+                    break;
+                case ScoutActivity.Fighting:
+                    WriteLog("State: Fighting");
+                    break;
+                case ScoutActivity.Restocking:
+                    WriteLog("State: Restocking");
+                    break;
+                case ScoutActivity.Scouting:
+                    WriteLog("State: Scouting");
+                    break;
+                case ScoutActivity.SetUpCamp:
+                    WriteLog("State: SetUpCamp");
+                    break;
+                case ScoutActivity.Sleeping:
+                    WriteLog("State: Sleeping");
+                    break;
+                case ScoutActivity.Walking:
+                    WriteLog("State: Walking");
+                    break;
+                case ScoutActivity.None:
+                    WriteLog("State: None");
+                    break;
+                default:
+                    WriteLog("State: Default");
+                    break;
+            }
+
             this.Activity = Activity;
         }
 
@@ -329,26 +352,38 @@ namespace ColonyTech.Classes
         {
             state.SetCooldown(2);
 
+            getScoutChunkManager().RemoveDoublePositions();
+
+            if (Activity == ScoutActivity.Scouting)
+            {
+                getScoutChunkManager().RegisterPositionScouted(currentDestination.ToChunk());
+            }
+
             if (Activity == ScoutActivity.Walking)
             {
                 SetActivity(ScoutActivity.Scouting);
-                Chunk chunkToScout = World.GetChunk(NPC.Position);
-                getScoutChunkManager().RegisterChunkScouted(chunkToScout);
+                Vector3Int positionToScout = NPC.Position;
+                getScoutChunkManager().RegisterPositionScouted(positionToScout);
                 state.SetCooldown(10);
             }
 
             Vector3Int belowNPC = new Vector3Int(NPC.Position.x, NPC.Position.y - 1, NPC.Position.z);
 
-            ServerManager.TryChangeBlock(belowNPC, BuiltinBlocks.Bricks);
-            WriteLog("OnNPCAtJob");
+            ServerManager.TryChangeBlock(belowNPC, BuiltinBlocks.BricksBlack);
 
-            if (!StockedUp) StockedUp = true;
+            //WriteLog("OnNPCAtJob");
+
+            if (!StockedUp)
+            {
+                StockedUp = true;
+                SetActivity(ScoutActivity.Scouting);
+            }
 
             var commenceBaseBuild = false;
 
             if (!IsOutsideMinimumRange(NPC.Position, BannerTracker.Get(NPC.Colony.Owner)))
             {
-                WriteLog("Not outsite minimum range!");
+                //WriteLog("Not outsite minimum range!");
                 return;
             }
 
@@ -385,11 +420,13 @@ namespace ColonyTech.Classes
 
         public void createPlatformUnder(Vector3Int position, ushort type)
         {
+            return;
             for (var i = 0; i < 13; i++)
             {
                 for (var j = 0; j < 13; j++)
                 {
                     Vector3Int pos = new Vector3Int(position.x-6+i, position.y-1, position.z-6+j);
+
                     ServerManager.TryChangeBlock(pos, type, NPC.Colony.Owner, ServerManager.SetBlockFlags.SendAudio);
                 }
             }

@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
+﻿using System.Collections.Generic;
+using Pipliz;
 
 namespace ColonyTech.Managers
 {
@@ -11,7 +8,7 @@ namespace ColonyTech.Managers
     {
         private static readonly ScoutChunkManager instance = new ScoutChunkManager();
 
-        private List<Chunk> chunks = new List<Chunk>();
+        private List<Vector3Int> positions = new List<Vector3Int>();
 
         static ScoutChunkManager()
         {
@@ -28,22 +25,37 @@ namespace ColonyTech.Managers
             get { return instance; }
         }
 
-        public bool hasChunk(Chunk chunk)
+        public bool hasPosition(Vector3Int position)
         {
-            return Instance.chunks.Contains(chunk);
+            return Instance.GetManagedChunks().Contains(position.ToChunk());
         }
 
-        public List<Chunk> getManagedChunks()
+        public List<Vector3Int> GetManagedChunks()
         {
-            return Instance.chunks;
+            return Instance.positions;
         }
 
-        public void RegisterChunkScouted(Chunk chunk)
+        public void RegisterPositionScouted(Vector3Int position)
         {
-            if (!Instance.hasChunk(chunk))
+            if (!Instance.hasPosition(position.ToChunk()))
             {
-                Instance.chunks.Add(chunk);
+                Instance.positions.Add(position.ToChunk());
             }
+        }
+
+        public void RemoveDoublePositions()
+        {
+            List<Vector3Int> uniquePositions = new List<Vector3Int>();
+
+            foreach (Vector3Int instancePosition in Instance.positions)
+            {
+                if (!uniquePositions.Contains(instancePosition))
+                {
+                    uniquePositions.Add(instancePosition);
+                }
+            }
+
+            Instance.positions = uniquePositions;
         }
     }
 }
