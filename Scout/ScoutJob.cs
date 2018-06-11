@@ -83,7 +83,7 @@ namespace ColonyTech.Classes
         #region ChunkFinding
 
         private bool increaseSteps = true;
-        private int stepAmount = 0, stepIncrease = 16, modifier = 1;
+        private int stepAmount = 0, stepIncrease = 16;
 
         private int pathingX = 0, pathingZ = 0;
 
@@ -91,13 +91,22 @@ namespace ColonyTech.Classes
         {
             Started,
             Turning,
-            Stepping,
-            IncreaseSteps
+            Stepping
         }
 
-        private int steppingProgress = 0;
-
         private PathingState PathState = PathingState.Started;
+        
+        private enum PathingDirection
+        {
+            NORTH,
+            EAST,
+            SOUTH,
+            WEST
+        }
+        
+        private PathingDirection Direction;
+
+        private int steppingProgress = 0;
 
         public bool findClosestUnscoutedChunk(out Vector3Int checkedPosition)
         {
@@ -128,65 +137,53 @@ namespace ColonyTech.Classes
                 WriteLog("Found before searching!");
                 return true;
             }
+            
+            bool foundChunk = false;
 
             while (CoordWithinBounds(this.pathingX, this.pathingZ, xStart, zStart, MaxChunkScoutRange * 16))
             {
-                //Only increase steps if we are in the correct state, since we start here every time we come back
-                //To avoid accidentally increasing stepAmount every time we look for unscouted chunks
-                if (PathState == PathingState.IncreaseSteps)
-                {
-                    if (increaseSteps)
-                    {
-                        stepAmount += stepIncrease;
-                        modifier *= -1;
-                    }
-
-                    PathState = PathingState.Stepping;
-                }
-
-                if (increaseSteps)
-                {
-                    PathState = PathingState.Stepping;
-                    for (int i = steppingProgress; i < stepAmount; i += 16)
-                    {
-                        this.pathingX += modifier;
-                        if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
+                switch(PathState) {
+                    case PathingState.Started:
+                        stepAmount = 1;
+                        Direction = PathingDirection.NORTH;
+                        PathState = PathingState.Stepping;
+                        break;
+                    case PathingState.Stepping:
+                        for(var steps = steppingProgress; steps < stepAmount; steps+=stepIncrease)
                         {
-                            break;
+                            if(!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition)
+                            {
+                                foundChunk = true;
+                                break;
+                            }
+                            steppingProgress += stepIncrease;
                         }
-                    }
-
-                    steppingProgress = 0;
-
-                    PathState = PathingState.Turning;
-                }
-                else
-                {
-                    PathState = PathingState.Stepping;
-                    for (int i = steppingProgress; i < stepAmount; i += 16)
-                    {
-                        this.pathingZ += modifier;
-                        if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
+                        break;
+                    case PathingState.Turning:
+                        //Always turn clock-wise
+                        switch(Direction)
                         {
-                            break;
+                            case PathingDirection.NORTH:
+                                Direction = PathingDirection.EAST;
+                                break;
+                            case PathingDirection.EAST:
+                                Direction = PathingDirection.SOUTH;
+                                //If we're going EAST, this means next we have to move further to go around
+                                stepAmount += stepIncrease;
+                                break;
+                            case PathingDirection.SOUTH:
+                                Direction = PathingDirection.WEST;
+                                break;
+                            case PathingDirection.WEST:
+                                Direction = PathingDirection.NORTH;
+                                //If we're going SOUTH, this means next we have to move further to go around
+                                stepAmount += stepIncrease;
+                                break;
                         }
-                    }
-
-                    steppingProgress = 0;
-
-                    PathState = PathingState.Turning;
+                        break;
                 }
 
-                if (PathState == PathingState.Turning)
-                {
-                    increaseSteps = !increaseSteps;
-                    if (increaseSteps)
-                    {
-                        PathState = PathingState.IncreaseSteps;
-                    }
-                }
-
-                if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
+                if (foundChunk)
                 {
                     WriteLog((pathingX - GetScoutBanner().KeyLocation.x) + ", " + (pathingZ - GetScoutBanner().KeyLocation.z));
                     return true;
