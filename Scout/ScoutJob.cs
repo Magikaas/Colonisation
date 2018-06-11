@@ -142,6 +142,13 @@ namespace ColonyTech.Classes
 
             while (CoordWithinBounds(this.pathingX, this.pathingZ, xStart, zStart, MaxChunkScoutRange * 16))
             {
+                Vector3Int positionToCheck = new Vector3Int(pathingX, y, pathingZ).ToChunk();
+                
+                if(!IsOutsideMinimumRange(positionToCheck, GetScoutBanner()))
+                {
+                    continue;
+                }
+                
                 switch(PathState) {
                     case PathingState.Started:
                         stepAmount = 1;
