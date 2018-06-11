@@ -129,6 +129,8 @@ namespace ColonyTech.Classes
                 return true;
             }
 
+            WriteLog("Start checking");
+
             while (CoordWithinBounds(this.pathingX, this.pathingZ, xStart, zStart, MaxChunkScoutRange * 16))
             {
                 //Only increase steps if we are in the correct state, since we start here every time we come back
@@ -137,6 +139,7 @@ namespace ColonyTech.Classes
                 {
                     if (increaseSteps)
                     {
+                        WriteLog("Change modifier and increase walk distance");
                         stepAmount += stepIncrease;
                         modifier *= -1;
                     }
@@ -146,13 +149,14 @@ namespace ColonyTech.Classes
 
                 if (increaseSteps)
                 {
+                    WriteLog("Move X");
                     PathState = PathingState.Stepping;
                     for (int i = steppingProgress; i < stepAmount; i += 16)
                     {
-                        this.pathingX += modifier;
+                        this.pathingX += stepIncrease * modifier;
                         if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
                         {
-                            break;
+                            return true;
                         }
                     }
 
@@ -162,13 +166,14 @@ namespace ColonyTech.Classes
                 }
                 else
                 {
+                    WriteLog("Move Z");
                     PathState = PathingState.Stepping;
                     for (int i = steppingProgress; i < stepAmount; i += 16)
                     {
-                        this.pathingZ += modifier;
+                        this.pathingZ += stepIncrease * modifier;
                         if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
                         {
-                            break;
+                            return true;
                         }
                     }
 
@@ -179,6 +184,7 @@ namespace ColonyTech.Classes
 
                 if (PathState == PathingState.Turning)
                 {
+                    WriteLog("Change direction");
                     increaseSteps = !increaseSteps;
                     if (increaseSteps)
                     {
@@ -188,7 +194,7 @@ namespace ColonyTech.Classes
 
                 if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
                 {
-                    WriteLog((pathingX - GetScoutBanner().KeyLocation.x) + ", " + (pathingZ - GetScoutBanner().KeyLocation.z));
+                    WriteLog(checkedPosition.ToString());
                     return true;
                 }
             }
@@ -285,7 +291,7 @@ namespace ColonyTech.Classes
 
             if (this.findClosestUnscoutedChunk(out Vector3Int targetLocation))
             {
-                WriteLog("Closest Chunk found: " + targetLocation.ToString());
+                //WriteLog("Closest Chunk found: " + targetLocation.ToString());
 
                 Activity = ScoutActivity.Walking;
 
@@ -508,7 +514,8 @@ namespace ColonyTech.Classes
         protected void WriteLog(string message)
         {
             if(Globals.DebugMode)
-                Log.Write(message);
+                //Log.Write(message);
+                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("ColonyTech", message);
         }
     }
 
