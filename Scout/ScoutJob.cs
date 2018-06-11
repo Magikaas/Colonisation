@@ -140,6 +140,8 @@ namespace ColonyTech.Classes
             
             bool foundChunk = false;
 
+            WriteLog("Start checking");
+
             while (CoordWithinBounds(this.pathingX, this.pathingZ, xStart, zStart, MaxChunkScoutRange * 16))
             {
                 Vector3Int positionToCheck = new Vector3Int(pathingX, y, pathingZ).ToChunk();
@@ -158,7 +160,7 @@ namespace ColonyTech.Classes
                     case PathingState.Stepping:
                         for(var steps = steppingProgress; steps < stepAmount; steps+=stepIncrease)
                         {
-                            if(!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition)
+                            if(!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition))
                             {
                                 foundChunk = true;
                                 break;
@@ -192,7 +194,7 @@ namespace ColonyTech.Classes
 
                 if (foundChunk)
                 {
-                    WriteLog((pathingX - GetScoutBanner().KeyLocation.x) + ", " + (pathingZ - GetScoutBanner().KeyLocation.z));
+                    WriteLog(checkedPosition.ToString());
                     return true;
                 }
             }
@@ -289,7 +291,7 @@ namespace ColonyTech.Classes
 
             if (this.findClosestUnscoutedChunk(out Vector3Int targetLocation))
             {
-                WriteLog("Closest Chunk found: " + targetLocation.ToString());
+                //WriteLog("Closest Chunk found: " + targetLocation.ToString());
 
                 Activity = ScoutActivity.Walking;
 
@@ -512,7 +514,8 @@ namespace ColonyTech.Classes
         protected void WriteLog(string message)
         {
             if(Globals.DebugMode)
-                Log.Write(message);
+                //Log.Write(message);
+                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("ColonyTech", message);
         }
     }
 
