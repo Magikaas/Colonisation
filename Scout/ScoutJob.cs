@@ -1,6 +1,8 @@
 ﻿using BlockTypes.Builtin;
+using ColonyTech.Classes;
 using ColonyTech.Managers;
 using NPC;
+using PhentrixGames.NewColonyAPI.Helpers;
 using Pipliz;
 using Pipliz.Mods.APIProvider.Jobs;
 using Server.AI;
@@ -8,7 +10,7 @@ using Server.NPCs;
 using UnityEngine;
 using Math = Pipliz.Math;
 
-namespace ColonyTech.Classes
+namespace ColonyTech
 {
     [ModLoader.ModManager]
     public class ScoutJob : BlockJobBase, IBlockJobBase, IJob, INPCTypeDefiner
@@ -81,11 +83,10 @@ namespace ColonyTech.Classes
         }
 
         #region ChunkFinding
-
-        private bool increaseSteps = true;
+        
         private int stepAmount = 0, stepIncrease = 16;
 
-        private int pathingX = 0, pathingZ = 0;
+        private int pathingX = 0, pathingZ = 0, xStart = 0, zStart = 0;
 
         private enum PathingState
         {
@@ -104,9 +105,116 @@ namespace ColonyTech.Classes
             WEST
         }
         
-        private PathingDirection Direction;
+        private PathingDirection Direction = PathingDirection.NORTH;
 
         private int steppingProgress = 0;
+
+        private void debugPrintDirection()
+        {
+            if (!Globals.DebugMode)
+                return;
+
+            switch (Direction)
+            {
+                case PathingDirection.NORTH:
+                    WriteLog("Direction: NORTH");
+                    break;
+                case PathingDirection.EAST:
+                    WriteLog("Direction: EAST");
+                    break;
+                case PathingDirection.SOUTH:
+                    WriteLog("Direction: SOUTH");
+                    break;
+                case PathingDirection.WEST:
+                    WriteLog("Direction: WEST");
+                    break;
+                default:
+                    WriteLog("INVALID DIRECTION");
+                    break;
+            }
+        }
+
+        private void debugPrintPathState()
+        {
+            if (!Globals.DebugMode)
+                return;
+
+            switch (PathState)
+            {
+                case PathingState.Started:
+                    WriteLog("Pathstate: Started");
+                    break;
+                case PathingState.Stepping:
+                    WriteLog("Pathstate: Stepping");
+                    break;
+                case PathingState.Turning:
+                    WriteLog("Pathstate: Turning");
+                    break;
+                default:
+                    WriteLog("INVALID PATHSTATE");
+                    break;
+            }
+        }
+
+        protected void TurnClockwise()
+        {
+            //Always turn clock-wise
+            switch (Direction)
+            {
+                case PathingDirection.NORTH:
+                    Direction = PathingDirection.EAST;
+                    break;
+                case PathingDirection.EAST:
+                    Direction = PathingDirection.SOUTH;
+
+                    //If we're going EAST, this means next we have to move further to go around
+                    stepAmount++;
+                    break;
+                case PathingDirection.SOUTH:
+                    Direction = PathingDirection.WEST;
+                    break;
+                case PathingDirection.WEST:
+                    Direction = PathingDirection.NORTH;
+
+                    //If we're going SOUTH, this means next we have to move further to go around
+                    stepAmount++;
+                    break;
+            }
+        }
+
+        protected void PerformStep()
+        {
+            switch (Direction)
+            {
+                case PathingDirection.NORTH:
+                    pathingX -= stepIncrease;
+                    break;
+                case PathingDirection.EAST:
+                    pathingZ += stepIncrease;
+                    break;
+                case PathingDirection.SOUTH:
+                    pathingX += stepIncrease;
+                    break;
+                case PathingDirection.WEST:
+                    pathingZ -= stepIncrease;
+                    break;
+                default:
+                    WriteLog("No valid direction!");
+                    break;
+            }
+        }
+
+        protected void PrintRelativePathingCoordinates()
+        {
+            WriteLog("X: " + (pathingX - xStart) + ". Z: " + (pathingZ - zStart));
+        }
+
+        protected void StartMoving()
+        {
+            steppingProgress = 0;
+
+            PathState = PathingState.Stepping;
+        }
 
         public bool findClosestUnscoutedChunk(out Vector3Int checkedPosition)
         {
@@ -120,7 +228,8 @@ namespace ColonyTech.Classes
                 this.pathingZ = GetScoutBanner().KeyLocation.z;
             }
 
-            int xStart = this.pathingX, zStart = this.pathingZ;
+            xStart = pathingX;
+            zStart = pathingZ;
 
             checkedPosition = new Vector3Int(this.pathingX, y, this.pathingZ);
 
@@ -132,7 +241,8 @@ namespace ColonyTech.Classes
                 return false;
             }
 
-            if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
+            if (!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition) &&
+                IsOutsideMinimumRange(new Vector3Int(pathingX, y, pathingZ), GetScoutBanner()))
             {
                 WriteLog("Found before searching!");
                 return true;
@@ -140,64 +250,74 @@ namespace ColonyTech.Classes
             
             bool foundChunk = false;
 
-            WriteLog("Start checking");
+            int counter = 0;
 
-            while (CoordWithinBounds(this.pathingX, this.pathingZ, xStart, zStart, MaxChunkScoutRange * 16))
+            //WriteLog("Start checking");
+
+            //WriteLog("X: " + pathingX + ". Z: " + pathingZ);
+
+            while (CoordWithinBounds(pathingX, pathingZ, GetScoutBanner().KeyLocation.x, GetScoutBanner().KeyLocation.z, MaxChunkScoutRange * 16))
             {
-                Vector3Int positionToCheck = new Vector3Int(pathingX, y, pathingZ).ToChunk();
-                
-                if(!IsOutsideMinimumRange(positionToCheck, GetScoutBanner()))
-                {
-                    continue;
-                }
-                
-                switch(PathState) {
+                debugPrintDirection();
+                debugPrintPathState();
+
+                switch (PathState) {
                     case PathingState.Started:
                         stepAmount = 1;
                         Direction = PathingDirection.NORTH;
                         PathState = PathingState.Stepping;
                         break;
                     case PathingState.Stepping:
-                        for(var steps = steppingProgress; steps < stepAmount; steps+=stepIncrease)
+                        for(var steps = steppingProgress; steps < stepAmount; steps++)
                         {
-                            if(!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition))
+                            WriteLog("Step: " + steps);
+
+                            if(!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition) &&
+                               IsOutsideMinimumRange(checkedPosition, GetScoutBanner()))
                             {
+                                WriteLog("Found something!");
+                                WriteLog("X: " + pathingX + ". Z: " + pathingZ);
+
                                 foundChunk = true;
+                                steppingProgress++;
+
+                                PerformStep();
+
                                 break;
                             }
-                            steppingProgress += stepIncrease;
+
+                            steppingProgress++;
+
+                            PerformStep();
                         }
+
+                        WriteLog("Done moving in direction.");
+
+                        PathState = PathingState.Turning;
                         break;
                     case PathingState.Turning:
-                        //Always turn clock-wise
-                        switch(Direction)
-                        {
-                            case PathingDirection.NORTH:
-                                Direction = PathingDirection.EAST;
-                                break;
-                            case PathingDirection.EAST:
-                                Direction = PathingDirection.SOUTH;
-                                //If we're going EAST, this means next we have to move further to go around
-                                stepAmount += stepIncrease;
-                                break;
-                            case PathingDirection.SOUTH:
-                                Direction = PathingDirection.WEST;
-                                break;
-                            case PathingDirection.WEST:
-                                Direction = PathingDirection.NORTH;
-                                //If we're going SOUTH, this means next we have to move further to go around
-                                stepAmount += stepIncrease;
-                                break;
-                        }
+                        TurnClockwise();
+                        StartMoving();
                         break;
+                }
+
+                WriteLog("X: " + pathingX + ". Z: " + pathingZ);
+                
+                if (!IsOutsideMinimumRange(checkedPosition, GetScoutBanner()))
+                {
+                    continue;
                 }
 
                 if (foundChunk)
                 {
+                    WriteLog("Found it!");
                     WriteLog(checkedPosition.ToString());
                     return true;
                 }
             }
+
+            //WriteLog("Stopped at:");
+            //WriteLog("X: " + pathingX + ". Z: " + pathingZ);
 
             WriteLog("Unable to find unscouted chunk.");
 
@@ -210,11 +330,6 @@ namespace ColonyTech.Classes
             bool InXRange = (x > (xStart - MaxRange)) && (x < (xStart + MaxRange));
             bool InZRange = (z > (zStart - MaxRange)) && (z < (zStart + MaxRange));
 
-            //WriteLog((x + " > " + (xStart - MaxRange) + ": " + (x > (xStart - MaxRange))) + (z + " > " + (zStart - MaxRange) + ": " + (z > (zStart - MaxRange))));
-            //WriteLog((x + " < " + (xStart + MaxRange) + ": " + (x < (xStart + MaxRange))) + (z + " < " + (zStart + MaxRange) + ": " + (z < (zStart + MaxRange))));
-
-            //WriteLog("XRAnge: " + InXRange + ". ZRange: " + InZRange);
-
             return InXRange && InZRange;
         }
 
@@ -224,6 +339,12 @@ namespace ColonyTech.Classes
 
             Server.AI.AIManager.TryGetClosestAIPosition(targetPosition,
                 AIManager.EAIClosestPositionSearchType.ChunkAndDirectNeighbours, out targetPosition);
+
+            if (targetPosition.x == -1 || targetPosition.y == -1 || targetPosition.z == -1)
+            {
+                WriteLog("Pathing Fucked up");
+                return true;
+            }
 
             return getScoutChunkManager().hasPosition(targetPosition);
         }
@@ -289,7 +410,7 @@ namespace ColonyTech.Classes
                 }
             }
 
-            if (this.findClosestUnscoutedChunk(out Vector3Int targetLocation))
+            if (findClosestUnscoutedChunk(out Vector3Int targetLocation))
             {
                 //WriteLog("Closest Chunk found: " + targetLocation.ToString());
 
@@ -313,12 +434,15 @@ namespace ColonyTech.Classes
                 (position.y > (banner.KeyLocation.y + (MinChunkScoutRange * 16)) ||
                  position.y < (banner.KeyLocation.y - (MinChunkScoutRange * 16))))
             {
+                WriteLog("Outside minimum range");
                 return true;
             }
+
+            WriteLog("Not outside minimum range");
             return false;
         }
 
-        public void SetActivity(ScoutActivity Activity)
+        protected void debugPrintActivity()
         {
             switch (Activity)
             {
@@ -350,13 +474,18 @@ namespace ColonyTech.Classes
                     WriteLog("State: Default");
                     break;
             }
+        }
+
+        public void SetActivity(ScoutActivity Activity)
+        {
+            debugPrintActivity();
 
             this.Activity = Activity;
         }
 
         public override void OnNPCAtJob(ref NPCBase.NPCState state)
         {
-            state.SetCooldown(2);
+            //state.SetCooldown(2);
 
             getScoutChunkManager().RemoveDoublePositions();
 
@@ -370,7 +499,7 @@ namespace ColonyTech.Classes
                 SetActivity(ScoutActivity.Scouting);
                 Vector3Int positionToScout = NPC.Position;
                 getScoutChunkManager().RegisterPositionScouted(positionToScout);
-                state.SetCooldown(10);
+                //state.SetCooldown(10);
             }
 
             Vector3Int belowNPC = new Vector3Int(NPC.Position.x, NPC.Position.y - 1, NPC.Position.z);
@@ -515,7 +644,15 @@ namespace ColonyTech.Classes
         {
             if(Globals.DebugMode)
                 //Log.Write(message);
-                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("ColonyTech", message);
+                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("ColonyTech", message, Utilities.LogType.Error);
+        }
+
+        protected void createPillarAbove(Vector3Int position, ushort type)
+        {
+            for (var i = 0; i < 50; i++)
+            {
+                ServerManager.TryChangeBlock(new Vector3Int(position.x, position.y + i + 6, position.z), type, Owner);
+            }
         }
     }
 

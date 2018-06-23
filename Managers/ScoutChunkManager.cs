@@ -27,6 +27,7 @@ namespace ColonyTech.Managers
 
         public bool hasPosition(Vector3Int position)
         {
+            //WriteLog("Has chunk at: " + position.ToString() + "? " + (Instance.GetManagedChunks().Contains(position.ToChunk()) ? "Yes" : "No"));
             return Instance.GetManagedChunks().Contains(position.ToChunk());
         }
 
@@ -56,6 +57,13 @@ namespace ColonyTech.Managers
             }
 
             Instance.positions = uniquePositions;
+        }
+
+        protected void WriteLog(string message)
+        {
+            if (Globals.DebugMode)
+                //Log.Write(message);
+                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("ColonyTech", message);
         }
     }
 }
