@@ -1,5 +1,6 @@
 ﻿using BlockTypes.Builtin;
 using ColonyTech.Classes;
+using ColonyTech.Colonies;
 using ColonyTech.Managers;
 using NPC;
 using PhentrixGames.NewColonyAPI.Helpers;
@@ -40,6 +41,8 @@ namespace ColonyTech
         private int MaxChunkScoutRange = 10;
 
         public override string NPCTypeKey => "colonytech." + JOB_STATION;
+
+        private int StarterColonySize = 10;
 
         public enum ScoutActivity
         {
@@ -236,31 +239,19 @@ namespace ColonyTech
             if (!AIManager.TryGetClosestAIPosition(checkedPosition, AIManager.EAIClosestPositionSearchType.ChunkAndDirectNeighbours,
                 out checkedPosition))
             {
-                WriteLog("Can't find AI position");
-                WriteLog(checkedPosition.ToString());
                 return false;
             }
 
             if (!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition) &&
                 IsOutsideMinimumRange(new Vector3Int(pathingX, y, pathingZ), GetScoutBanner()))
             {
-                WriteLog("Found before searching!");
                 return true;
             }
             
             bool foundChunk = false;
 
-            int counter = 0;
-
-            //WriteLog("Start checking");
-
-            //WriteLog("X: " + pathingX + ". Z: " + pathingZ);
-
             while (CoordWithinBounds(pathingX, pathingZ, GetScoutBanner().KeyLocation.x, GetScoutBanner().KeyLocation.z, MaxChunkScoutRange * 16))
             {
-                debugPrintDirection();
-                debugPrintPathState();
-
                 switch (PathState) {
                     case PathingState.Started:
                         stepAmount = 1;
@@ -270,14 +261,9 @@ namespace ColonyTech
                     case PathingState.Stepping:
                         for(var steps = steppingProgress; steps < stepAmount; steps++)
                         {
-                            WriteLog("Step: " + steps);
-
-                            if(!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition) &&
+                            if (!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition) &&
                                IsOutsideMinimumRange(checkedPosition, GetScoutBanner()))
                             {
-                                WriteLog("Found something!");
-                                WriteLog("X: " + pathingX + ". Z: " + pathingZ);
-
                                 foundChunk = true;
                                 steppingProgress++;
 
@@ -290,8 +276,6 @@ namespace ColonyTech
 
                             PerformStep();
                         }
-
-                        WriteLog("Done moving in direction.");
 
                         PathState = PathingState.Turning;
                         break;
@@ -310,14 +294,10 @@ namespace ColonyTech
 
                 if (foundChunk)
                 {
-                    WriteLog("Found it!");
                     WriteLog(checkedPosition.ToString());
                     return true;
                 }
             }
-
-            //WriteLog("Stopped at:");
-            //WriteLog("X: " + pathingX + ". Z: " + pathingZ);
 
             WriteLog("Unable to find unscouted chunk.");
 
@@ -412,8 +392,6 @@ namespace ColonyTech
 
             if (findClosestUnscoutedChunk(out Vector3Int targetLocation))
             {
-                //WriteLog("Closest Chunk found: " + targetLocation.ToString());
-
                 Activity = ScoutActivity.Walking;
 
                 currentDestination = targetLocation;
@@ -506,7 +484,7 @@ namespace ColonyTech
 
             ServerManager.TryChangeBlock(belowNPC, BuiltinBlocks.BricksBlack);
 
-            //WriteLog("OnNPCAtJob");
+            WriteLog("OnNPCAtJob");
 
             if (!StockedUp)
             {
@@ -555,7 +533,6 @@ namespace ColonyTech
 
         public void createPlatformUnder(Vector3Int position, ushort type)
         {
-            return;
             for (var i = 0; i < 13; i++)
             {
                 for (var j = 0; j < 13; j++)
@@ -581,11 +558,34 @@ namespace ColonyTech
 
         private void PrepareBase()
         {
+            WriteLog("Preparing Base at " + NPC.Position);
             //Implement stacking of blocks to build a temporary base
+            AIColony colony = StartColony();
+
+          
+
+            FlattenArea(NPC.Position, this.StarterColonySize);
         }
 
-        private void FlattenArea()
+        private AIColony StartColony()
         {
+            AIColony colony = ColonyTracker.AddColony(new Banner(NPC.Position, AIPlayer.GenerateNewAIPlayer()));
+
+            return colony;
+        }
+
+        private void FlattenArea(Vector3Int center, int range)
+        {
+            for (int x = center.x - range; x < center.x + range; x++)
+            {
+                for (int z = center.z - range; z < center.z + range; z++)
+                {
+                    for (int y = NPC.Position.y; y < NPC.Position.y + 20; y++)
+                    {
+                        ServerManager.TryChangeBlock(new Vector3Int(x, y, z), BuiltinBlocks.Air, Owner);
+                    }
+                }
+            }
         }
 
         private int AmountOfBlocksToCheck()

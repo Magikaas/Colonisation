@@ -25,6 +25,16 @@
     "icon": "./icons/scoutrallypoint.png",
     "onPlaceAudio": "woodPlace",
     "onRemoveAudio": "woodDeleteLight",
-    "sideall": "bricks" 
-  } 
+    "sideall": "bricks"
+  },
+  "aicolonybanner": {
+    "categories": [
+      "essential"
+    ],
+    "destructionTime": 1000,
+    "icon": "./icons/aicolonybanner.png",
+    "onPlaceAudio": "woodPlace",
+    "onRemoveAudio": "woodDeleteLight",
+    "sideall": "bricks"
+  }
 }

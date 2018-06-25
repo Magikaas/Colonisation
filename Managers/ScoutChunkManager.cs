@@ -58,12 +58,5 @@ namespace ColonyTech.Managers
 
             Instance.positions = uniquePositions;
         }
-
-        protected void WriteLog(string message)
-        {
-            if (Globals.DebugMode)
-                //Log.Write(message);
-                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("ColonyTech", message);
-        }
     }
 }
