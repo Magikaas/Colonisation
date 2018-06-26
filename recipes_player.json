@@ -1,6 +1,6 @@
 ﻿[
   {
-    "name": "colonytech.oreprocessor",
+    "name": "colonisation.oreprocessor",
     "requires": [
       {
         "amount": 1,
@@ -14,7 +14,7 @@
     ]
   },
   {
-    "name": "colonytech.scoutrallypoint",
+    "name": "colonisation.scoutrallypoint",
     "requires": [
       {
         "amount": 1,

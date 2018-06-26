@@ -1,6 +1,6 @@
 ﻿[
   {
-    "name": "colonytech.oreprocessor.refinedcopper",
+    "name": "colonisation.oreprocessor.refinedcopper",
     "requires": [
       {
         "amount": 1,

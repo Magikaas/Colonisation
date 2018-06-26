@@ -1,14 +1,18 @@
 ﻿using BlockTypes.Builtin;
-using ColonyTech.Managers;
+using Colonisation.Classes;
+using Colonisation.Colonies;
+using Colonisation.Managers;
 using NPC;
+using PhentrixGames.NewColonyAPI.Helpers;
 using Pipliz;
 using Pipliz.Mods.APIProvider.Jobs;
 using Server.AI;
 using Server.NPCs;
+using System.Collections.Generic;
 using UnityEngine;
 using Math = Pipliz.Math;
 
-namespace ColonyTech.Classes
+namespace Colonisation
 {
     [ModLoader.ModManager]
     public class ScoutJob : BlockJobBase, IBlockJobBase, IJob, INPCTypeDefiner
@@ -37,7 +41,7 @@ namespace ColonyTech.Classes
         //Max range from scout rally point to scout, to avoid NPCs going too far away from the base
         private int MaxChunkScoutRange = 10;
 
-        public override string NPCTypeKey => "colonytech." + JOB_STATION;
+        public override string NPCTypeKey => "Colonisation." + JOB_STATION;
 
         public enum ScoutActivity
         {
@@ -77,27 +81,142 @@ namespace ColonyTech.Classes
 
         private ITrackableBlock GetScoutBanner()
         {
-            return BannerTracker.Get(NPC.Colony.Owner);
+            return BannerTracker.Get(GetColonyOwner());
         }
 
         #region ChunkFinding
+        
+        private int stepAmount = 0, stepIncrease = 16;
 
-        private bool increaseSteps = true;
-        private int stepAmount = 0, stepIncrease = 16, modifier = 1;
-
-        private int pathingX = 0, pathingZ = 0;
+        private int pathingX = 0, pathingZ = 0, xStart = 0, zStart = 0;
 
         private enum PathingState
         {
             Started,
             Turning,
-            Stepping,
-            IncreaseSteps
+            Stepping
         }
+
+        private PathingState PathState = PathingState.Started;
+        
+        private enum PathingDirection
+        {
+            NORTH,
+            EAST,
+            SOUTH,
+            WEST
+        }
+        
+        private PathingDirection Direction = PathingDirection.NORTH;
 
         private int steppingProgress = 0;
 
-        private PathingState PathState = PathingState.Started;
+        private void debugPrintDirection()
+        {
+            if (!Globals.DebugMode)
+                return;
+
+            switch (Direction)
+            {
+                case PathingDirection.NORTH:
+                    WriteLog("Direction: NORTH");
+                    break;
+                case PathingDirection.EAST:
+                    WriteLog("Direction: EAST");
+                    break;
+                case PathingDirection.SOUTH:
+                    WriteLog("Direction: SOUTH");
+                    break;
+                case PathingDirection.WEST:
+                    WriteLog("Direction: WEST");
+                    break;
+                default:
+                    WriteLog("INVALID DIRECTION");
+                    break;
+            }
+        }
+
+        private void debugPrintPathState()
+        {
+            if (!Globals.DebugMode)
+                return;
+
+            switch (PathState)
+            {
+                case PathingState.Started:
+                    WriteLog("Pathstate: Started");
+                    break;
+                case PathingState.Stepping:
+                    WriteLog("Pathstate: Stepping");
+                    break;
+                case PathingState.Turning:
+                    WriteLog("Pathstate: Turning");
+                    break;
+                default:
+                    WriteLog("INVALID PATHSTATE");
+                    break;
+            }
+        }
+
+        protected void TurnClockwise()
+        {
+            //Always turn clock-wise
+            switch (Direction)
+            {
+                case PathingDirection.NORTH:
+                    Direction = PathingDirection.EAST;
+                    break;
+                case PathingDirection.EAST:
+                    Direction = PathingDirection.SOUTH;
+
+                    //If we're going EAST, this means next we have to move further to go around
+                    stepAmount++;
+                    break;
+                case PathingDirection.SOUTH:
+                    Direction = PathingDirection.WEST;
+                    break;
+                case PathingDirection.WEST:
+                    Direction = PathingDirection.NORTH;
+
+                    //If we're going SOUTH, this means next we have to move further to go around
+                    stepAmount++;
+                    break;
+            }
+        }
+
+        protected void PerformStep()
+        {
+            switch (Direction)
+            {
+                case PathingDirection.NORTH:
+                    pathingX -= stepIncrease;
+                    break;
+                case PathingDirection.EAST:
+                    pathingZ += stepIncrease;
+                    break;
+                case PathingDirection.SOUTH:
+                    pathingX += stepIncrease;
+                    break;
+                case PathingDirection.WEST:
+                    pathingZ -= stepIncrease;
+                    break;
+                default:
+                    WriteLog("No valid direction!");
+                    break;
+            }
+        }
+
+        protected void PrintRelativePathingCoordinates()
+        {
+            WriteLog("X: " + (pathingX - xStart) + ". Z: " + (pathingZ - zStart));
+        }
+
+        protected void StartMoving()
+        {
+            steppingProgress = 0;
+
+            PathState = PathingState.Stepping;
+        }
 
         public bool findClosestUnscoutedChunk(out Vector3Int checkedPosition)
         {
@@ -111,89 +230,71 @@ namespace ColonyTech.Classes
                 this.pathingZ = GetScoutBanner().KeyLocation.z;
             }
 
-            int xStart = this.pathingX, zStart = this.pathingZ;
+            xStart = pathingX;
+            zStart = pathingZ;
 
             checkedPosition = new Vector3Int(this.pathingX, y, this.pathingZ);
 
             if (!AIManager.TryGetClosestAIPosition(checkedPosition, AIManager.EAIClosestPositionSearchType.ChunkAndDirectNeighbours,
                 out checkedPosition))
             {
-                WriteLog("Can't find AI position");
-                WriteLog(checkedPosition.ToString());
                 return false;
             }
 
-            if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
+            if (!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition) &&
+                IsOutsideMinimumRange(new Vector3Int(pathingX, y, pathingZ), GetScoutBanner()))
             {
-                WriteLog("Found before searching!");
                 return true;
             }
+            
+            bool foundChunk = false;
 
-            while (CoordWithinBounds(this.pathingX, this.pathingZ, xStart, zStart, MaxChunkScoutRange * 16))
+            while (CoordWithinBounds(pathingX, pathingZ, GetScoutBanner().KeyLocation.x, GetScoutBanner().KeyLocation.z, MaxChunkScoutRange * 16))
             {
-                //Only increase steps if we are in the correct state, since we start here every time we come back
-                //To avoid accidentally increasing stepAmount every time we look for unscouted chunks
-                if (PathState == PathingState.IncreaseSteps)
-                {
-                    if (increaseSteps)
-                    {
-                        stepAmount += stepIncrease;
-                        modifier *= -1;
-                    }
-
-                    PathState = PathingState.Stepping;
-                }
-
-                if (increaseSteps)
-                {
-                    PathState = PathingState.Stepping;
-                    for (int i = steppingProgress; i < stepAmount; i += 16)
-                    {
-                        this.pathingX += modifier;
-                        if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
+                switch (PathState) {
+                    case PathingState.Started:
+                        stepAmount = 1;
+                        Direction = PathingDirection.NORTH;
+                        PathState = PathingState.Stepping;
+                        break;
+                    case PathingState.Stepping:
+                        for(var steps = steppingProgress; steps < stepAmount; steps++)
                         {
-                            break;
+                            if (!ChunkManagerHasChunkAt(pathingX, y, pathingZ, out checkedPosition) &&
+                               IsOutsideMinimumRange(checkedPosition, GetScoutBanner()))
+                            {
+                                foundChunk = true;
+                                steppingProgress++;
+
+                                PerformStep();
+
+                                break;
+                            }
+
+                            steppingProgress++;
+
+                            PerformStep();
                         }
-                    }
 
-                    steppingProgress = 0;
-
-                    PathState = PathingState.Turning;
+                        PathState = PathingState.Turning;
+                        break;
+                    case PathingState.Turning:
+                        TurnClockwise();
+                        StartMoving();
+                        break;
                 }
-                else
+                
+                if (!IsOutsideMinimumRange(checkedPosition, GetScoutBanner()))
                 {
-                    PathState = PathingState.Stepping;
-                    for (int i = steppingProgress; i < stepAmount; i += 16)
-                    {
-                        this.pathingZ += modifier;
-                        if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
-                        {
-                            break;
-                        }
-                    }
-
-                    steppingProgress = 0;
-
-                    PathState = PathingState.Turning;
+                    continue;
                 }
 
-                if (PathState == PathingState.Turning)
+                if (foundChunk)
                 {
-                    increaseSteps = !increaseSteps;
-                    if (increaseSteps)
-                    {
-                        PathState = PathingState.IncreaseSteps;
-                    }
-                }
-
-                if (!ChunkManagerHasChunkAt(this.pathingX, y, this.pathingZ, out checkedPosition))
-                {
-                    WriteLog((pathingX - GetScoutBanner().KeyLocation.x) + ", " + (pathingZ - GetScoutBanner().KeyLocation.z));
+                    WriteLog(checkedPosition.ToString());
                     return true;
                 }
             }
-
-            WriteLog("Unable to find unscouted chunk.");
 
             output = Vector3Int.invalidPos;
             return false;
@@ -204,11 +305,6 @@ namespace ColonyTech.Classes
             bool InXRange = (x > (xStart - MaxRange)) && (x < (xStart + MaxRange));
             bool InZRange = (z > (zStart - MaxRange)) && (z < (zStart + MaxRange));
 
-            //WriteLog((x + " > " + (xStart - MaxRange) + ": " + (x > (xStart - MaxRange))) + (z + " > " + (zStart - MaxRange) + ": " + (z > (zStart - MaxRange))));
-            //WriteLog((x + " < " + (xStart + MaxRange) + ": " + (x < (xStart + MaxRange))) + (z + " < " + (zStart + MaxRange) + ": " + (z < (zStart + MaxRange))));
-
-            //WriteLog("XRAnge: " + InXRange + ". ZRange: " + InZRange);
-
             return InXRange && InZRange;
         }
 
@@ -218,6 +314,12 @@ namespace ColonyTech.Classes
 
             Server.AI.AIManager.TryGetClosestAIPosition(targetPosition,
                 AIManager.EAIClosestPositionSearchType.ChunkAndDirectNeighbours, out targetPosition);
+
+            if (targetPosition.x == -1 || targetPosition.y == -1 || targetPosition.z == -1)
+            {
+                WriteLog("Pathing Fucked up");
+                return true;
+            }
 
             return getScoutChunkManager().hasPosition(targetPosition);
         }
@@ -283,10 +385,8 @@ namespace ColonyTech.Classes
                 }
             }
 
-            if (this.findClosestUnscoutedChunk(out Vector3Int targetLocation))
+            if (findClosestUnscoutedChunk(out Vector3Int targetLocation))
             {
-                WriteLog("Closest Chunk found: " + targetLocation.ToString());
-
                 Activity = ScoutActivity.Walking;
 
                 currentDestination = targetLocation;
@@ -304,15 +404,16 @@ namespace ColonyTech.Classes
         {
             if ((position.x > (banner.KeyLocation.x + (MinChunkScoutRange * 16)) ||
                  position.x < (banner.KeyLocation.x - (MinChunkScoutRange * 16))) &&
-                (position.y > (banner.KeyLocation.y + (MinChunkScoutRange * 16)) ||
-                 position.y < (banner.KeyLocation.y - (MinChunkScoutRange * 16))))
+                (position.z > (banner.KeyLocation.z + (MinChunkScoutRange * 16)) ||
+                 position.z < (banner.KeyLocation.z - (MinChunkScoutRange * 16))))
             {
                 return true;
             }
+            
             return false;
         }
 
-        public void SetActivity(ScoutActivity Activity)
+        protected void debugPrintActivity()
         {
             switch (Activity)
             {
@@ -344,6 +445,11 @@ namespace ColonyTech.Classes
                     WriteLog("State: Default");
                     break;
             }
+        }
+
+        public void SetActivity(ScoutActivity Activity)
+        {
+            debugPrintActivity();
 
             this.Activity = Activity;
         }
@@ -364,7 +470,7 @@ namespace ColonyTech.Classes
                 SetActivity(ScoutActivity.Scouting);
                 Vector3Int positionToScout = NPC.Position;
                 getScoutChunkManager().RegisterPositionScouted(positionToScout);
-                state.SetCooldown(10);
+                state.SetCooldown(2);
             }
 
             Vector3Int belowNPC = new Vector3Int(NPC.Position.x, NPC.Position.y - 1, NPC.Position.z);
@@ -381,9 +487,8 @@ namespace ColonyTech.Classes
 
             var commenceBaseBuild = false;
 
-            if (!IsOutsideMinimumRange(NPC.Position, BannerTracker.Get(NPC.Colony.Owner)))
+            if (!IsOutsideMinimumRange(NPC.Position, BannerTracker.Get(GetColonyOwner())))
             {
-                //WriteLog("Not outsite minimum range!");
                 return;
             }
 
@@ -418,16 +523,18 @@ namespace ColonyTech.Classes
             state.SetCooldown(0.5);
         }
 
-        public void createPlatformUnder(Vector3Int position, ushort type)
+        public void createPlatformUnder(Vector3Int position, ushort type, int radius = -1)
         {
-            return;
+            if (radius == -1)
+                radius = StandardBaseRadius;
+
             for (var i = 0; i < 13; i++)
             {
                 for (var j = 0; j < 13; j++)
                 {
                     Vector3Int pos = new Vector3Int(position.x-6+i, position.y-1, position.z-6+j);
 
-                    ServerManager.TryChangeBlock(pos, type, NPC.Colony.Owner, ServerManager.SetBlockFlags.SendAudio);
+                    ServerManager.TryChangeBlock(pos, type, GetColonyOwner(), ServerManager.SetBlockFlags.SendAudio);
                 }
             }
         }
@@ -446,11 +553,70 @@ namespace ColonyTech.Classes
 
         private void PrepareBase()
         {
+            WriteLog("Preparing Base at " + NPC.Position);
             //Implement stacking of blocks to build a temporary base
+            AIColony colony = StartColony();
+
+            FlattenArea(NPC.Position);
+            createPlatformUnder(NPC.Position, BuiltinBlocks.GrassTemperate);
         }
 
-        private void FlattenArea()
+        private int StandardBaseRadius = 24;
+
+        private AIColony StartColony()
         {
+            AIColony colony = ColonyTracker.AddColony(new Banner(NPC.Position, AIPlayer.GenerateNewAIPlayer(Owner)));
+
+            return colony;
+        }
+
+        private void FlattenArea(Vector3Int center, int radius = -1)
+        {
+            if (radius == -1)
+                radius = StandardBaseRadius;
+            WriteLog("Flattening Area at: " + center.ToString());
+
+            for (int x = center.x - radius; x < center.x + radius; x++)
+            {
+                for (int z = center.z - radius; z < center.z + radius; z++)
+                {
+                    for (int y = NPC.Position.y; y < NPC.Position.y + 20; y++)
+                    {
+                        NPCRemoveBlock(new Vector3Int(x, y, z));
+                    }
+                }
+            }
+        }
+
+        private void CreateTrench(Vector3Int center, int radius = -1)
+        {
+            if (radius == -1)
+                radius = StandardBaseRadius;
+
+            for (int x = center.x - radius; x < center.x + radius; x++)
+            {
+                for (int z = center.z - radius; z < center.z + radius; z++)
+                {
+                    for(int y = center.y - 1; y > center.y - 2; y--)
+                    {
+                        if ((x >= center.x - radius && x <= center.x + radius) ||
+                            (z >= center.z - radius && z <= center.z + radius))
+                        {
+                            WriteLog("Blah");
+                        }
+                        NPCRemoveBlock(new Vector3Int(x, center.y, z));
+                    }
+                }
+            }
+        }
+
+        private void NPCRemoveBlock(Vector3Int position)
+        {
+            if(World.TryGetTypeAt(position, out ushort type))
+            {
+                GetStockpile().Add(type);
+            }
+            ServerManager.TryChangeBlock(position, BuiltinBlocks.Air, Owner);
         }
 
         private int AmountOfBlocksToCheck()
@@ -508,7 +674,43 @@ namespace ColonyTech.Classes
         protected void WriteLog(string message)
         {
             if(Globals.DebugMode)
-                Log.Write(message);
+                //Log.Write(message);
+                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("Colonisation", message, Utilities.LogType.Error);
+        }
+
+        protected void createPillarAbove(Vector3Int position, ushort type)
+        {
+            for (var i = 0; i < 50; i++)
+            {
+                ServerManager.TryChangeBlock(new Vector3Int(position.x, position.y + i + 6, position.z), type, Owner);
+            }
+        }
+
+        private Players.Player GetColonyOwner()
+        {
+            return GetColony().Owner;
+        }
+
+        private Colony GetColony()
+        {
+            return NPC.Colony;
+        }
+
+        private Stockpile GetStockpile()
+        {
+            var Stockpile = GetColony().UsedStockpile;
+
+            var List = new List<Stockpile>();
+
+            /**
+             * 
+            if(Stockpile.GetType().Equals(List.GetType()))
+            {
+                return ((List<Stockpile>)Stockpile).ToArray()[0];
+            }
+            */
+
+            return Stockpile;
         }
     }
 

@@ -1,11 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace ColonyTech
+﻿namespace Colonisation.Classes
 {
-
     [ModLoader.ModManager]
     public static class TechBlocks
     {
@@ -30,10 +24,12 @@ namespace ColonyTech
     public static class GeneralBlocks
     {
         public static ushort ScoutRallyPoint;
+        public static ushort AIColonyBanner;
 
         public static void ResolveIndices()
         {
             GeneralBlocks.ScoutRallyPoint = GeneralBlocks.ToIndex("scoutrallypoint");
+            GeneralBlocks.AIColonyBanner = GeneralBlocks.ToIndex("aicolonybanner");
         }
 
         private static ushort ToIndex(string name)

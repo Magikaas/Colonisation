@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Pipliz;
 
-namespace ColonyTech.Managers
+namespace Colonisation.Managers
 {
     [ModLoader.ModManager]
     public sealed class ScoutChunkManager
@@ -27,6 +27,7 @@ namespace ColonyTech.Managers
 
         public bool hasPosition(Vector3Int position)
         {
+            //WriteLog("Has chunk at: " + position.ToString() + "? " + (Instance.GetManagedChunks().Contains(position.ToChunk()) ? "Yes" : "No"));
             return Instance.GetManagedChunks().Contains(position.ToChunk());
         }
 

@@ -4,7 +4,7 @@ using PhentrixGames.NewColonyAPI.Classes;
 using Pipliz;
 using UnityEngine;
 
-namespace ColonyTech.Commands
+namespace Colonisation.Commands
 {
     [Command]
     class TeleportXYZ : BaseChatCommand, IChatCommand

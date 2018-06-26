@@ -1,12 +1,9 @@
-﻿using BlockTypes.Builtin;
-using ColonyTech;
-using PhentrixGames.NewColonyAPI.Jobs;
-using Pipliz;
+﻿using Colonisation.Classes;
 using Pipliz.Mods.APIProvider.Jobs;
 using Server.NPCs;
 using UnityEngine;
 
-namespace ColonyTech.BlockNPCs
+namespace Colonisation.BlockNPCs
 {
     [ModLoader.ModManager]
     class OreProcessorJob : CraftingJobBase, IBlockJobBase, INPCTypeDefiner
@@ -30,7 +27,7 @@ namespace ColonyTech.BlockNPCs
 
         public override string NPCTypeKey
         {
-            get { return "colonytech.oreprocessorjob"; }
+            get { return "Colonisation.oreprocessorjob"; }
         }
 
         NPCTypeStandardSettings INPCTypeDefiner.GetNPCTypeDefinition()
