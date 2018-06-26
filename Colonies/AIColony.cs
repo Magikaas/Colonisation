@@ -14,7 +14,7 @@ namespace Colonisation.Colonies
 
         public void CreateBase(Vector3Int position)
         {
-            CreateClearing(position);
+            //CreateClearing(position);
         }
 
         private void CreateClearing(Vector3Int position, int radius = 24)

@@ -8,6 +8,7 @@ using Pipliz;
 using Pipliz.Mods.APIProvider.Jobs;
 using Server.AI;
 using Server.NPCs;
+using System.Collections.Generic;
 using UnityEngine;
 using Math = Pipliz.Math;
 
@@ -41,8 +42,6 @@ namespace Colonisation
         private int MaxChunkScoutRange = 10;
 
         public override string NPCTypeKey => "Colonisation." + JOB_STATION;
-
-        private int StarterColonySize = 10;
 
         public enum ScoutActivity
         {
@@ -82,7 +81,7 @@ namespace Colonisation
 
         private ITrackableBlock GetScoutBanner()
         {
-            return BannerTracker.Get(NPC.Colony.Owner);
+            return BannerTracker.Get(GetColonyOwner());
         }
 
         #region ChunkFinding
@@ -284,8 +283,6 @@ namespace Colonisation
                         StartMoving();
                         break;
                 }
-
-                WriteLog("X: " + pathingX + ". Z: " + pathingZ);
                 
                 if (!IsOutsideMinimumRange(checkedPosition, GetScoutBanner()))
                 {
@@ -298,8 +295,6 @@ namespace Colonisation
                     return true;
                 }
             }
-
-            WriteLog("Unable to find unscouted chunk.");
 
             output = Vector3Int.invalidPos;
             return false;
@@ -412,11 +407,9 @@ namespace Colonisation
                 (position.z > (banner.KeyLocation.z + (MinChunkScoutRange * 16)) ||
                  position.z < (banner.KeyLocation.z - (MinChunkScoutRange * 16))))
             {
-                WriteLog("Outside minimum range");
                 return true;
             }
-
-            //WriteLog("Not outside minimum range");
+            
             return false;
         }
 
@@ -494,9 +487,8 @@ namespace Colonisation
 
             var commenceBaseBuild = false;
 
-            if (!IsOutsideMinimumRange(NPC.Position, BannerTracker.Get(NPC.Colony.Owner)))
+            if (!IsOutsideMinimumRange(NPC.Position, BannerTracker.Get(GetColonyOwner())))
             {
-                //WriteLog("Not outsite minimum range!");
                 return;
             }
 
@@ -531,15 +523,18 @@ namespace Colonisation
             state.SetCooldown(0.5);
         }
 
-        public void createPlatformUnder(Vector3Int position, ushort type)
+        public void createPlatformUnder(Vector3Int position, ushort type, int radius = -1)
         {
+            if (radius == -1)
+                radius = StandardBaseRadius;
+
             for (var i = 0; i < 13; i++)
             {
                 for (var j = 0; j < 13; j++)
                 {
                     Vector3Int pos = new Vector3Int(position.x-6+i, position.y-1, position.z-6+j);
 
-                    ServerManager.TryChangeBlock(pos, type, NPC.Colony.Owner, ServerManager.SetBlockFlags.SendAudio);
+                    ServerManager.TryChangeBlock(pos, type, GetColonyOwner(), ServerManager.SetBlockFlags.SendAudio);
                 }
             }
         }
@@ -562,10 +557,11 @@ namespace Colonisation
             //Implement stacking of blocks to build a temporary base
             AIColony colony = StartColony();
 
-          
-
-            FlattenArea(NPC.Position, this.StarterColonySize);
+            FlattenArea(NPC.Position);
+            createPlatformUnder(NPC.Position, BuiltinBlocks.GrassTemperate);
         }
+
+        private int StandardBaseRadius = 24;
 
         private AIColony StartColony()
         {
@@ -574,18 +570,53 @@ namespace Colonisation
             return colony;
         }
 
-        private void FlattenArea(Vector3Int center, int range)
+        private void FlattenArea(Vector3Int center, int radius = -1)
         {
-            for (int x = center.x - range; x < center.x + range; x++)
+            if (radius == -1)
+                radius = StandardBaseRadius;
+            WriteLog("Flattening Area at: " + center.ToString());
+
+            for (int x = center.x - radius; x < center.x + radius; x++)
             {
-                for (int z = center.z - range; z < center.z + range; z++)
+                for (int z = center.z - radius; z < center.z + radius; z++)
                 {
                     for (int y = NPC.Position.y; y < NPC.Position.y + 20; y++)
                     {
-                        ServerManager.TryChangeBlock(new Vector3Int(x, y, z), BuiltinBlocks.Air, Owner);
+                        NPCRemoveBlock(new Vector3Int(x, y, z));
                     }
                 }
             }
+        }
+
+        private void CreateTrench(Vector3Int center, int radius = -1)
+        {
+            if (radius == -1)
+                radius = StandardBaseRadius;
+
+            for (int x = center.x - radius; x < center.x + radius; x++)
+            {
+                for (int z = center.z - radius; z < center.z + radius; z++)
+                {
+                    for(int y = center.y - 1; y > center.y - 2; y--)
+                    {
+                        if ((x >= center.x - radius && x <= center.x + radius) ||
+                            (z >= center.z - radius && z <= center.z + radius))
+                        {
+                            WriteLog("Blah");
+                        }
+                        NPCRemoveBlock(new Vector3Int(x, center.y, z));
+                    }
+                }
+            }
+        }
+
+        private void NPCRemoveBlock(Vector3Int position)
+        {
+            if(World.TryGetTypeAt(position, out ushort type))
+            {
+                GetStockpile().Add(type);
+            }
+            ServerManager.TryChangeBlock(position, BuiltinBlocks.Air, Owner);
         }
 
         private int AmountOfBlocksToCheck()
@@ -653,6 +684,33 @@ namespace Colonisation
             {
                 ServerManager.TryChangeBlock(new Vector3Int(position.x, position.y + i + 6, position.z), type, Owner);
             }
+        }
+
+        private Players.Player GetColonyOwner()
+        {
+            return GetColony().Owner;
+        }
+
+        private Colony GetColony()
+        {
+            return NPC.Colony;
+        }
+
+        private Stockpile GetStockpile()
+        {
+            var Stockpile = GetColony().UsedStockpile;
+
+            var List = new List<Stockpile>();
+
+            /**
+             * 
+            if(Stockpile.GetType().Equals(List.GetType()))
+            {
+                return ((List<Stockpile>)Stockpile).ToArray()[0];
+            }
+            */
+
+            return Stockpile;
         }
     }
 
