@@ -473,10 +473,6 @@ namespace Colonisation
                 state.SetCooldown(2);
             }
 
-            Vector3Int belowNPC = new Vector3Int(NPC.Position.x, NPC.Position.y - 1, NPC.Position.z);
-
-            ServerManager.TryChangeBlock(belowNPC, BuiltinBlocks.BricksBlack);
-
             //WriteLog("OnNPCAtJob");
 
             if (!StockedUp)
@@ -523,18 +519,16 @@ namespace Colonisation
             state.SetCooldown(0.5);
         }
 
-        public void createPlatformUnder(Vector3Int position, ushort type, int radius = -1)
+        public void createPlatformUnder(Vector3Int center, ushort type, int radius = -1)
         {
             if (radius == -1)
                 radius = StandardBaseRadius;
 
-            for (var i = 0; i < 13; i++)
+            for (int x = center.x - radius; x < center.x + radius; x++)
             {
-                for (var j = 0; j < 13; j++)
+                for (int z = center.z - radius; z < center.z + radius; z++)
                 {
-                    Vector3Int pos = new Vector3Int(position.x-6+i, position.y-1, position.z-6+j);
-
-                    ServerManager.TryChangeBlock(pos, type, GetColonyOwner(), ServerManager.SetBlockFlags.SendAudio);
+                    NPCPlaceBlock(new Vector3Int(x, center.y - 1, z), type);
                 }
             }
         }
@@ -559,6 +553,7 @@ namespace Colonisation
 
             FlattenArea(NPC.Position);
             createPlatformUnder(NPC.Position, BuiltinBlocks.GrassTemperate);
+            createPlatformUnder(new Vector3Int(NPC.Position.x, NPC.Position.y-1, NPC.Position.z), BuiltinBlocks.GrassTemperate);
         }
 
         private int StandardBaseRadius = 24;
@@ -602,9 +597,8 @@ namespace Colonisation
                         if ((x >= center.x - radius && x <= center.x + radius) ||
                             (z >= center.z - radius && z <= center.z + radius))
                         {
-                            WriteLog("Blah");
+                            NPCRemoveBlock(new Vector3Int(x, center.y, z));
                         }
-                        NPCRemoveBlock(new Vector3Int(x, center.y, z));
                     }
                 }
             }
@@ -614,9 +608,47 @@ namespace Colonisation
         {
             if(World.TryGetTypeAt(position, out ushort type))
             {
+                List<ItemTypes.ItemTypeDrops> ItemDrops = ItemTypes.GetType(type).OnRemoveItems;
+
+                NPC.Inventory.Add(ItemDrops);
+
                 GetStockpile().Add(type);
             }
-            ServerManager.TryChangeBlock(position, BuiltinBlocks.Air, Owner);
+            NPCPlaceBlock(position, BuiltinBlocks.Air, Owner);
+        }
+
+        private bool NPCPlaceBlock(Vector3Int position, ushort type, Players.Player Player = null, bool replaceBlock = false)
+        {
+            if(World.TryGetTypeAt(position, out ushort existingType))
+            {
+                if(replaceBlock && BuiltinBlocks.Air != existingType)
+                {
+                    NPCRemoveBlock(position);
+                }
+            }
+
+            if(Player == null)
+            {
+                Player = GetColonyOwner();
+            }
+
+            if(BuiltinBlocks.Air != type)
+            {
+                if(!GetStockpile().Contains(type))
+                {
+                    return false;
+                }
+            }
+
+            if (BuiltinBlocks.Air != existingType)
+            {
+                if(replaceBlock)
+                {
+                    ServerManager.TryChangeBlock(position, type, Player, ServerManager.SetBlockFlags.SendAudio);
+                    return true;
+                }
+            }
+            return false;
         }
 
         private int AmountOfBlocksToCheck()
@@ -682,7 +714,7 @@ namespace Colonisation
         {
             for (var i = 0; i < 50; i++)
             {
-                ServerManager.TryChangeBlock(new Vector3Int(position.x, position.y + i + 6, position.z), type, Owner);
+                NPCPlaceBlock(new Vector3Int(position.x, position.y + i + 6, position.z), type, Owner);
             }
         }
 
