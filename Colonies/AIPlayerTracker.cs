@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace ColonyTech.Colonies
+namespace Colonisation.Colonies
 {
     [ModLoader.ModManager]
     public static class AIPlayerTracker
@@ -13,6 +13,11 @@ namespace ColonyTech.Colonies
         public static void AddAIPlayer(AIPlayer AIPlayer)
         {
             AIPlayerTracker.AIPlayers.Add(AIPlayer);
+        }
+
+        public static List<AIPlayer> GetByPlayer(Players.Player Player)
+        {
+            return AIPlayerTracker.AIPlayers.FindAll(p => p.GetPlayer().ID == Player.ID);
         }
     }
 }

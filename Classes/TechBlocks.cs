@@ -1,4 +1,4 @@
-﻿namespace ColonyTech.Classes
+﻿namespace Colonisation.Classes
 {
     [ModLoader.ModManager]
     public static class TechBlocks

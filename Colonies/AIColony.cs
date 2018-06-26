@@ -2,7 +2,7 @@
 using Pipliz.JSON;
 using BlockTypes.Builtin;
 
-namespace ColonyTech.Colonies
+namespace Colonisation.Colonies
 {
     [ModLoader.ModManager]
     public class AIColony : Colony
@@ -14,7 +14,7 @@ namespace ColonyTech.Colonies
 
         public void CreateBase(Vector3Int position)
         {
-
+            CreateClearing(position);
         }
 
         private void CreateClearing(Vector3Int position, int radius = 24)
@@ -51,9 +51,21 @@ namespace ColonyTech.Colonies
         {
         }
 
-        public static AIPlayer GenerateNewAIPlayer()
+        public static AIPlayer GenerateNewAIPlayer(Players.Player Owner)
         {
-            return new AIPlayer(NetworkID.Server);
+            AIPlayer AIPlayer = new AIPlayer(NetworkID.Server);
+            AIPlayer.SetPlayer(Owner);
+            return AIPlayer;
+        }
+
+        public void SetPlayer(Players.Player BasePlayer)
+        {
+            this.BasePlayer = BasePlayer;
+        }
+
+        public Players.Player GetPlayer()
+        {
+            return this.BasePlayer;
         }
     }
 }

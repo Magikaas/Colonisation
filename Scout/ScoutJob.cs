@@ -1,7 +1,7 @@
 ﻿using BlockTypes.Builtin;
-using ColonyTech.Classes;
-using ColonyTech.Colonies;
-using ColonyTech.Managers;
+using Colonisation.Classes;
+using Colonisation.Colonies;
+using Colonisation.Managers;
 using NPC;
 using PhentrixGames.NewColonyAPI.Helpers;
 using Pipliz;
@@ -11,7 +11,7 @@ using Server.NPCs;
 using UnityEngine;
 using Math = Pipliz.Math;
 
-namespace ColonyTech
+namespace Colonisation
 {
     [ModLoader.ModManager]
     public class ScoutJob : BlockJobBase, IBlockJobBase, IJob, INPCTypeDefiner
@@ -40,7 +40,7 @@ namespace ColonyTech
         //Max range from scout rally point to scout, to avoid NPCs going too far away from the base
         private int MaxChunkScoutRange = 10;
 
-        public override string NPCTypeKey => "colonytech." + JOB_STATION;
+        public override string NPCTypeKey => "Colonisation." + JOB_STATION;
 
         private int StarterColonySize = 10;
 
@@ -463,7 +463,7 @@ namespace ColonyTech
 
         public override void OnNPCAtJob(ref NPCBase.NPCState state)
         {
-            //state.SetCooldown(2);
+            state.SetCooldown(2);
 
             getScoutChunkManager().RemoveDoublePositions();
 
@@ -477,7 +477,7 @@ namespace ColonyTech
                 SetActivity(ScoutActivity.Scouting);
                 Vector3Int positionToScout = NPC.Position;
                 getScoutChunkManager().RegisterPositionScouted(positionToScout);
-                //state.SetCooldown(10);
+                state.SetCooldown(2);
             }
 
             Vector3Int belowNPC = new Vector3Int(NPC.Position.x, NPC.Position.y - 1, NPC.Position.z);
@@ -569,7 +569,7 @@ namespace ColonyTech
 
         private AIColony StartColony()
         {
-            AIColony colony = ColonyTracker.AddColony(new Banner(NPC.Position, AIPlayer.GenerateNewAIPlayer()));
+            AIColony colony = ColonyTracker.AddColony(new Banner(NPC.Position, AIPlayer.GenerateNewAIPlayer(Owner)));
 
             return colony;
         }
@@ -644,7 +644,7 @@ namespace ColonyTech
         {
             if(Globals.DebugMode)
                 //Log.Write(message);
-                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("ColonyTech", message, Utilities.LogType.Error);
+                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("Colonisation", message, Utilities.LogType.Error);
         }
 
         protected void createPillarAbove(Vector3Int position, ushort type)

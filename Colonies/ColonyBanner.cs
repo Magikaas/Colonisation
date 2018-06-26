@@ -2,7 +2,7 @@
 using Pipliz.Chatting;
 using Pipliz.JSON;
 
-namespace ColonyTech.Colonies
+namespace Colonisation.Colonies
 {
     [ModLoader.ModManager]
     class ColonyBanner : ITrackableBlock

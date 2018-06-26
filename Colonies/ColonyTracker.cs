@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using BlockTypes.Builtin;
 
-namespace ColonyTech.Colonies
+namespace Colonisation.Colonies
 {
     [ModLoader.ModManager]
     public sealed class ColonyTracker

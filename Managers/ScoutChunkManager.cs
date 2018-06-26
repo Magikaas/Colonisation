@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Pipliz;
 
-namespace ColonyTech.Managers
+namespace Colonisation.Managers
 {
     [ModLoader.ModManager]
     public sealed class ScoutChunkManager
