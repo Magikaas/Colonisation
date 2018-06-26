@@ -409,14 +409,14 @@ namespace Colonisation
         {
             if ((position.x > (banner.KeyLocation.x + (MinChunkScoutRange * 16)) ||
                  position.x < (banner.KeyLocation.x - (MinChunkScoutRange * 16))) &&
-                (position.y > (banner.KeyLocation.y + (MinChunkScoutRange * 16)) ||
-                 position.y < (banner.KeyLocation.y - (MinChunkScoutRange * 16))))
+                (position.z > (banner.KeyLocation.z + (MinChunkScoutRange * 16)) ||
+                 position.z < (banner.KeyLocation.z - (MinChunkScoutRange * 16))))
             {
                 WriteLog("Outside minimum range");
                 return true;
             }
 
-            WriteLog("Not outside minimum range");
+            //WriteLog("Not outside minimum range");
             return false;
         }
 
@@ -484,7 +484,7 @@ namespace Colonisation
 
             ServerManager.TryChangeBlock(belowNPC, BuiltinBlocks.BricksBlack);
 
-            WriteLog("OnNPCAtJob");
+            //WriteLog("OnNPCAtJob");
 
             if (!StockedUp)
             {
