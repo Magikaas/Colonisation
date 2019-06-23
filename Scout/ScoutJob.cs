@@ -1,21 +1,16 @@
-﻿using BlockTypes.Builtin;
-using Colonisation.Classes;
+﻿using Colonisation.Classes;
 using Colonisation.Colonies;
 using Colonisation.Managers;
 using NPC;
 using PhentrixGames.NewColonyAPI.Helpers;
 using Pipliz;
-using Pipliz.Mods.APIProvider.Jobs;
-using Server.AI;
-using Server.NPCs;
 using System.Collections.Generic;
-using UnityEngine;
 using Math = Pipliz.Math;
 
 namespace Colonisation
 {
     [ModLoader.ModManager]
-    public class ScoutJob : BlockJobBase, IBlockJobBase, IJob, INPCTypeDefiner
+    public class ScoutJob : NPCBase, NPCType
     {
         public enum Suitability
         {
@@ -35,6 +30,12 @@ namespace Colonisation
 
         //Amount of chunks away from scout to check for suitability (0 = own chunk, 1 = 3x3, 2 = 5x5, etc...)
         private int ChunkCheckRange = 1;
+        private int ChunkSize = 16;
+
+        private int ChunkCheckRangeBlocks
+        {
+            get { return ChunkCheckRange * ChunkSize; }
+        }
 
         private int MinChunkScoutRange = 2;
 
@@ -55,6 +56,8 @@ namespace Colonisation
             Sleeping
         }
 
+
+
         private ScoutActivity Activity;
 
         private Vector3Int currentDestination;
@@ -67,6 +70,8 @@ namespace Colonisation
         public ITrackableBlock InitializeOnAdd(Vector3Int position, ushort type, Players.Player player)
         {
             InitializeJob(player, position, 0);
+            
+
             SetActivity(ScoutActivity.None);
             return this;
         }
@@ -204,6 +209,53 @@ namespace Colonisation
                     WriteLog("No valid direction!");
                     break;
             }
+
+            Vector3Int targetPosition = new Vector3Int(pathingX, NPC.Position.y, pathingZ);
+
+            // To show where we have checked, add a visual landmark in the game
+            createPillarAbove(targetPosition, BuiltinBlocks.BricksBlack);
+
+            debugPrintDirection();
+            WriteLog("Going to: " + targetPosition.ToString());
+        }
+
+        protected bool FindGroundChunkVertical(Vector3Int position, out Vector3Int newPosition)
+        {
+            //See if we can path to the target position
+            if (Server.AI.AIManager.TryGetClosestAIPosition(position,
+                AIManager.EAIClosestPositionSearchType.ChunkSelf, out newPosition))
+            {
+                return true;
+            } else
+            {
+                //We can't path directly
+                if (World.TryGetTypeAt(position, out ushort type))
+                {
+                    //See if we're in the air
+                    if(type == BuiltinBlocks.Air)
+                    {
+                        if(Server.AI.AIManager.TryGetClosestAIPosition(position,
+                        AIManager.EAIClosestPositionSearchType.ChunkSelf, out newPosition))
+                        {
+                            return true;
+                        } else
+                        {
+                            return FindGroundChunkVertical(new Vector3Int(position.x, position.y - 16, position.z), out newPosition);
+                        }
+                    } else
+                    {
+                        //We're in the ground.
+                        return FindGroundChunkVertical(new Vector3Int(position.x, position.y + 16, position.z).ToChunk(), out newPosition);
+                    }
+                } else
+                {
+                    //We couldn't load anything about the target position
+                    Server.AI.AIManager.TryGetClosestAIPosition(position,
+                    AIManager.EAIClosestPositionSearchType.ChunkSelf, out newPosition);
+
+                    return false;
+                }
+            }
         }
 
         protected void PrintRelativePathingCoordinates()
@@ -235,9 +287,11 @@ namespace Colonisation
 
             checkedPosition = new Vector3Int(this.pathingX, y, this.pathingZ);
 
-            if (!AIManager.TryGetClosestAIPosition(checkedPosition, AIManager.EAIClosestPositionSearchType.ChunkAndDirectNeighbours,
-                out checkedPosition))
+            Vector3Int aaaa = checkedPosition;
+            
+            if(!FindGroundChunkVertical(checkedPosition, out checkedPosition))
             {
+                WriteLog("Could not find anything! " + aaaa.ToString());
                 return false;
             }
 
@@ -312,12 +366,10 @@ namespace Colonisation
         {
             targetPosition = new Vector3Int(x, y, z).ToChunk();
 
-            Server.AI.AIManager.TryGetClosestAIPosition(targetPosition,
-                AIManager.EAIClosestPositionSearchType.ChunkAndDirectNeighbours, out targetPosition);
+            FindGroundChunkVertical(targetPosition, out targetPosition);
 
             if (targetPosition.x == -1 || targetPosition.y == -1 || targetPosition.z == -1)
             {
-                WriteLog("Pathing Fucked up");
                 return true;
             }
 
@@ -402,6 +454,7 @@ namespace Colonisation
 
         public bool IsOutsideMinimumRange(Vector3Int position, ITrackableBlock banner)
         {
+            return true;
             if ((position.x > (banner.KeyLocation.x + (MinChunkScoutRange * 16)) ||
                  position.x < (banner.KeyLocation.x - (MinChunkScoutRange * 16))) &&
                 (position.z > (banner.KeyLocation.z + (MinChunkScoutRange * 16)) ||
@@ -541,7 +594,8 @@ namespace Colonisation
                 printName = "Scout",
                 maskColor1 = new Color32(255, 255, 255, 255),
                 type = NPCTypeID.GetNextID(),
-                inventoryCapacity = 20
+                inventoryCapacity = 20,
+                movementSpeed = 15
             };
         }
 
@@ -588,14 +642,14 @@ namespace Colonisation
             if (radius == -1)
                 radius = StandardBaseRadius;
 
-            for (int x = center.x - radius; x < center.x + radius; x++)
+            for (int x = center.x - radius - 1; x < center.x + radius + 1; x++)
             {
-                for (int z = center.z - radius; z < center.z + radius; z++)
+                for (int z = center.z - radius - 1; z < center.z + radius + 1; z++)
                 {
-                    for(int y = center.y - 1; y > center.y - 2; y--)
+                    for(int y = center.y - 1; y > center.y - 3; y--)
                     {
-                        if ((x >= center.x - radius && x <= center.x + radius) ||
-                            (z >= center.z - radius && z <= center.z + radius))
+                        if ((x == center.x - radius - 1 || x == center.x + radius + 1) ||
+                            (z == center.z - radius - 1 || z == center.z + radius + 1))
                         {
                             NPCRemoveBlock(new Vector3Int(x, center.y, z));
                         }
@@ -612,12 +666,14 @@ namespace Colonisation
 
                 NPC.Inventory.Add(ItemDrops);
 
-                GetStockpile().Add(type);
+                // TODO: Remove after numbers are down to normal amounts, figure out why we loot so many items
+                //GetStockpile().Add(type);
             }
-            NPCPlaceBlock(position, BuiltinBlocks.Air, Owner);
+
+            //ServerManager.TryChangeBlock(position, BuiltinBlocks.Air, GetColonyOwner(), ServerManager.SetBlockFlags.SendAudio);
         }
 
-        private bool NPCPlaceBlock(Vector3Int position, ushort type, Players.Player Player = null, bool replaceBlock = false)
+        private bool NPCPlaceBlock(Vector3Int position, ushort type, Players.Player Player = null, bool replaceBlock = true)
         {
             if(World.TryGetTypeAt(position, out ushort existingType))
             {
@@ -636,15 +692,20 @@ namespace Colonisation
             {
                 if(!GetStockpile().Contains(type))
                 {
-                    return false;
+                    // Temporarily turn this off while testing
+                    //return false;
                 }
             }
 
-            if (BuiltinBlocks.Air != existingType)
+            World.TryIsSolid(position, out bool isSolid);
+
+            ServerManager.TryChangeBlock(position, type, Player, ServerManager.SetBlockFlags.SendAudio);
+
+            if (isSolid)
             {
                 if(replaceBlock)
                 {
-                    ServerManager.TryChangeBlock(position, type, Player, ServerManager.SetBlockFlags.SendAudio);
+
                     return true;
                 }
             }
@@ -653,7 +714,9 @@ namespace Colonisation
 
         private int AmountOfBlocksToCheck()
         {
-            return Math.Pow2(ChunkCheckRange * 2 + 1);
+            int blockCheck = (ChunkCheckRange * ChunkSize) * 2 + 1;
+
+            return Math.Pow2(blockCheck);
         }
 
         private Suitability calculateAreaSuitability()
@@ -664,8 +727,8 @@ namespace Colonisation
 
             PrepareHeightsTable();
 
-            for (var x = ChunkCheckRange * -1; x < ChunkCheckRange; x++)
-            for (var z = ChunkCheckRange * -1; z < ChunkCheckRange; z++)
+            for (var x = ChunkCheckRange * ChunkSize * -1; x <= ChunkCheckRange * ChunkSize; x++)
+            for (var z = ChunkCheckRange * ChunkSize * - 1; z <= ChunkCheckRange * ChunkSize; z++)
                 //We check from top to bottom, one square at a time
                 //Once we find a type at said location, we record its 'height' relative to ourselves
                 //And after that, we continue on to the next coordinate, since we know the height
@@ -691,9 +754,22 @@ namespace Colonisation
             heightsTable = new RecordedHeight[AmountOfBlocksToCheck()];
         }
 
+
+        /**
+         * Index is determined by x * chunkcheckrage + z (chunkcheckrage is the range around the NPC to check) to keep the index from being overwritten
+         */
         private void RecordHeight(int x, int y, int z)
         {
-            var index = (x + ChunkCheckRange) * ChunkCheckRange + z + ChunkCheckRange;
+            //Total width of the area to check
+            int matrixWidth = (ChunkCheckRange * ChunkSize) * 2 + 1;
+
+            //Only half of the width, minus the column the NPC is in
+            int halfWidth = (ChunkCheckRange * ChunkSize);
+
+            //x + half the width starts at 0 and ends at matrixWidth
+            //Multiply that by the number of coordinates per row and we get
+            //the index of this height's record
+            var index = ((x + halfWidth) * matrixWidth) + z + halfWidth;
 
             heightsTable[index] = new RecordedHeight(x, y, z);
         }
@@ -714,7 +790,7 @@ namespace Colonisation
         {
             for (var i = 0; i < 50; i++)
             {
-                NPCPlaceBlock(new Vector3Int(position.x, position.y + i + 6, position.z), type, Owner);
+                NPCPlaceBlock(new Vector3Int(position.x, position.y + i + 6, position.z), type, GetColonyOwner());
             }
         }
 

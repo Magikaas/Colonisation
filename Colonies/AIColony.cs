@@ -1,13 +1,12 @@
 ﻿using Pipliz;
 using Pipliz.JSON;
-using BlockTypes.Builtin;
+using BlockTypes;
 
 namespace Colonisation.Colonies
 {
-    [ModLoader.ModManager]
     public class AIColony : Colony
     {
-        public AIColony(Players.Player player) : base(player)
+        public AIColony(int ID) : base(ID)
         {
 
         }
@@ -28,44 +27,14 @@ namespace Colonisation.Colonies
                         Vector3Int targetPosition = new Vector3Int(x, y, z);
                         if (World.TryGetTypeAt(targetPosition, out ushort type))
                         {
-                            if(BuiltinBlocks.Air != type)
+                            if(BuiltinBlocks.Indices.air != type)
                             {
-                                ServerManager.TryChangeBlock(targetPosition, BuiltinBlocks.Air, this.Owner, ServerManager.SetBlockFlags.SendAudio);
+                                ServerManager.TryChangeBlock(targetPosition, BuiltinBlocks.Indices.air, new BlockChangeRequestOrigin(this.Owners[0]));
                             }
                         }
                     }
                 }
             }
-        }
-    }
-
-    [ModLoader.ModManager]
-    public class AIPlayer : Players.Player
-    {
-        private Players.Player BasePlayer;
-        public AIPlayer(NetworkID owner) : base(owner)
-        {
-        }
-
-        public AIPlayer(NetworkID owner, JSONNode node) : base(owner, node)
-        {
-        }
-
-        public static AIPlayer GenerateNewAIPlayer(Players.Player Owner)
-        {
-            AIPlayer AIPlayer = new AIPlayer(NetworkID.Server);
-            AIPlayer.SetPlayer(Owner);
-            return AIPlayer;
-        }
-
-        public void SetPlayer(Players.Player BasePlayer)
-        {
-            this.BasePlayer = BasePlayer;
-        }
-
-        public Players.Player GetPlayer()
-        {
-            return this.BasePlayer;
         }
     }
 }

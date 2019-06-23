@@ -1,10 +1,7 @@
 using System;
 using System.IO;
-using Colonisation.BlockNPCs;
-using PhentrixGames.NewColonyAPI.Helpers;
-using Pipliz.Mods.APIProvider.Jobs;
 
-namespace Colonisation.Jobs
+namespace Colonisation.NewJobs
 {
     [ModLoader.ModManager]
     public static class ModEntry
@@ -16,15 +13,13 @@ namespace Colonisation.Jobs
         public const string ModName = "Colonisation";
         public const string Naming = "Colonisation.Jobs.";
 
+        [ModLoader.ModCallback(ModLoader.EModCallbackType.AfterModsLoaded, Naming + "AfterModsLoaded")]
+        [ModLoader.ModCallbackProvidesFor("Colonisation.Colonisation.Dependencies")]
         [ModLoader.ModCallback(ModLoader.EModCallbackType.OnAssemblyLoaded, Naming + "OnAssemblyLoaded")]
         public static void OnAssemblyLoaded(string path)
         {
             ModFolder = Path.GetDirectoryName(path).Replace("\\", "/");
             ModGameDataDirectory = Path.Combine(Path.GetDirectoryName(path), "gamedata/").Replace("\\", "/");
-
-            LocalizationFolder = Path.Combine(ModGameDataDirectory, "localization/").Replace("\\", "/");
-            Utilities.CreateLogs("Colonisation");
-            PhentrixGames.NewColonyAPI.Managers.ConfigManager.RegisterConfig("Colonisation", "Magikaas/Colonisation");
         }
 
         [ModLoader.ModCallback(ModLoader.EModCallbackType.AfterStartup, Naming + "AfterStartup")]
@@ -38,12 +33,15 @@ namespace Colonisation.Jobs
         }
 
         [ModLoader.ModCallback(ModLoader.EModCallbackType.AfterItemTypesDefined, Naming + "RegisterJobs")]
-        [ModLoader.ModCallbackProvidesFor("pipliz.apiprovider.jobs.resolvetypes")]
+        [ModLoader.ModCallbackDependsOn("create_servermanager_trackers")]
+        [ModLoader.ModCallbackDependsOn("pipliz.server.loadnpctypes")]
+        [ModLoader.ModCallbackProvidesFor("create_savemanager")]
         public static void RegisterJobs()
         {
             Pipliz.Log.Write("Colonisation Test");
-            BlockJobManagerTracker.Register<OreProcessorJob>(OreProcessorJob.JOB_STATION);
-            BlockJobManagerTracker.Register<ScoutJob>(ScoutJob.JOB_STATION);
+
+            Colonisation.ScoutJob.ScoutJobSettings scoutJobSettings = new Colonisation.ScoutJob.ScoutJobSettings("Scout", "colonisation.scoutjob", new InventoryItem("scoutrallypoint"));
+            ServerManager.BlockEntityCallbacks.RegisterEntityManager(new Jobs.BlockJobManager<Colonisation.ScoutJob.ScoutJobInstance>(scoutJobSettings));
         }
     }
 }

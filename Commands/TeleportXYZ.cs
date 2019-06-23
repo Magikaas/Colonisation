@@ -1,15 +1,13 @@
-﻿using ChatCommands;
-using PhentrixGames.NewColonyAPI;
+﻿using PhentrixGames.NewColonyAPI;
 using PhentrixGames.NewColonyAPI.Classes;
-using Pipliz;
 using UnityEngine;
 
 namespace Colonisation.Commands
 {
-    [Command]
-    class TeleportXYZ : BaseChatCommand, IChatCommand
+    [AttributeCommand]
+    class TeleportXYZ : BaseChatCommand
     {
-        public TeleportXYZ() : base("/tp", null, "/tp <playername> X Y Z") { }
+        public TeleportXYZ() : base("/tp", "", "/tp <playername> X Y Z") { }
 
         protected override bool RunCommand(Players.Player id, string args)
         {

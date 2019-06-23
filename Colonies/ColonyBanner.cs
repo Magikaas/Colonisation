@@ -1,18 +1,19 @@
 ﻿using Pipliz;
-using Pipliz.Chatting;
 using Pipliz.JSON;
 
 namespace Colonisation.Colonies
 {
     [ModLoader.ModManager]
-    class ColonyBanner : ITrackableBlock
+    class ColonyBanner : BlockEntities.Implementations.BannerTracker.Banner
     {
+        public ColonyBanner(Vector3Int pos, ByteReader reader) : base(pos, reader);
+
         public void OnRemove()
         {
-            Pipliz.Chatting.Chat.Send(this.Owner, "AIColony has been removed!");
+            Chatting.Chat.Send(this.Owner, "AIColony has been removed!");
         }
 
-        public ITrackableBlock InitializeFromJSON(Players.Player player, JSONNode node)
+        public BlockEntities.Implementations.BannerTracker.Banner InitializeFromJSON(Players.Player player, JSONNode node)
         {
             return this;
         }
