@@ -27,11 +27,8 @@ namespace Colonisation.ScoutJob
         public static void WriteLog(this string message)
         {
             if (Globals.DebugMode)
-            {
                 //Log.Write(message);
-                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("Colonisation", message, true);
-                Chatting.Chat.Send<Players.Player[]>(Players.PlayerDatabase.Values.ToArray<Players.Player>(), message);
-            }
+                PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("Colonisation", message, Utilities.LogType.Error);
         }
 
         public const string JOB_ALIAS = "scoutjob";

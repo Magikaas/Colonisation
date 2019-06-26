@@ -6,19 +6,14 @@ using System.Threading.Tasks;
 using Jobs;
 using NPC;
 using Pipliz;
-using BlockTypes;
 
 namespace Colonisation.ScoutJob
 {
     class ScoutJobSettings : Jobs.IBlockJobSettings
     {
-        public virtual string NPCTypeKey { get { return "colonisation.scout"; } }
-
-        public virtual float CraftingCooldown { get; set; }
-
         public ItemTypes.ItemType[] BlockTypes { get; }
 
-        public virtual NPCType NPCType { get; set; }
+        public NPCType NPCType => new NPCType();
 
         public InventoryItem RecruitmentItem { get; }
 
@@ -28,20 +23,13 @@ namespace Colonisation.ScoutJob
 
         public float NPCShopGameHourMaximum => TimeCycle.Settings.SleepTimeStart;
 
-        public ScoutJobSettings(string Name, string jobName, InventoryItem inventoryItem)
-        {
-            ScoutJobHelper.WriteLog("Setting up settings for " + Name + " (" + jobName + ")");
-            BlockTypes = new ItemTypes.ItemType[] { Classes.GeneralBlocks.ScoutRallyPoint };
-            NPCType = NPCType.GetByKeyNameOrDefault(NPCTypeKey);
-            CraftingCooldown = 5f;
-        }
-
         public Vector3Int GetJobLocation(BlockJobInstance instance)
         {
             ScoutJobInstance scoutJobInstance = (ScoutJobInstance)instance;
 
             if (!scoutJobInstance.StockedUp)
             {
+                if (!scoutJobInstance.worldTypeChecked) CheckWorldType();
                 ScoutJobHelper.WriteLog("Not stocked up");
                 scoutJobInstance.SetActivity(ScoutJobGlobals.ScoutActivity.Restocking);
                 return scoutJobInstance.Position;
@@ -73,7 +61,7 @@ namespace Colonisation.ScoutJob
                 }
             }
 
-            if (findClosestUnscoutedChunk(scoutJobInstance, out Vector3Int targetLocation))
+            if (findClosestUnscoutedChunk(out Vector3Int targetLocation))
             {
                 scoutJobInstance.Activity = ScoutJobGlobals.ScoutActivity.Walking;
 
@@ -86,92 +74,6 @@ namespace Colonisation.ScoutJob
                 ScoutJobHelper.WriteLog("Nothing to scout found.");
                 return scoutJobInstance.Position;
             }
-        }
-
-        public bool findClosestUnscoutedChunk(BlockJobInstance instance, out Vector3Int checkedPosition)
-        {
-            ScoutJobInstance scoutJobInstance = (ScoutJobInstance)instance;
-
-            Vector3Int output = scoutJobInstance.NPC.Position;
-
-            int y = 64;
-
-            if (scoutJobInstance.PathState == ScoutJobInstance.PathingState.Started)
-            {
-                scoutJobInstance.pathingX = scoutJobInstance.GetScoutBanner().Position.x;
-                scoutJobInstance.pathingZ = scoutJobInstance.GetScoutBanner().Position.z;
-            }
-
-            scoutJobInstance.xStart = scoutJobInstance.pathingX;
-            scoutJobInstance.zStart = scoutJobInstance.pathingZ;
-
-            checkedPosition = new Vector3Int(scoutJobInstance.pathingX, y, scoutJobInstance.pathingZ);
-
-            bool canPath;
-
-            if (!AI.PathingManager.TryGetClosestPositionWorldNotAt(scoutJobInstance.currentDestination, scoutJobInstance.Position, out canPath, out checkedPosition))
-            {
-                return false;
-            }
-
-            if (!scoutJobInstance.ChunkManagerHasChunkAt(scoutJobInstance.pathingX, y, scoutJobInstance.pathingZ, out checkedPosition) &&
-                scoutJobInstance.IsOutsideMinimumRange(new Vector3Int(scoutJobInstance.pathingX, y, scoutJobInstance.pathingZ), scoutJobInstance.GetScoutBanner()))
-            {
-                return true;
-            }
-
-            bool foundChunk = false;
-
-            while (scoutJobInstance.CoordWithinBounds(scoutJobInstance.pathingX, scoutJobInstance.pathingZ, scoutJobInstance.GetScoutBanner().Position.x, scoutJobInstance.GetScoutBanner().Position.z, scoutJobInstance.MaxChunkScoutRange * 16))
-            {
-                switch (scoutJobInstance.PathState)
-                {
-                    case ScoutJobInstance.PathingState.Started:
-                        scoutJobInstance.stepAmount = 1;
-                        scoutJobInstance.Direction = ScoutJobInstance.PathingDirection.NORTH;
-                        scoutJobInstance.PathState = ScoutJobInstance.PathingState.Stepping;
-                        break;
-                    case ScoutJobInstance.PathingState.Stepping:
-                        for (var steps = scoutJobInstance.steppingProgress; steps < scoutJobInstance.stepAmount; steps++)
-                        {
-                            if (!scoutJobInstance.ChunkManagerHasChunkAt(scoutJobInstance.pathingX, y, scoutJobInstance.pathingZ, out checkedPosition) &&
-                               scoutJobInstance.IsOutsideMinimumRange(checkedPosition, scoutJobInstance.GetScoutBanner()))
-                            {
-                                foundChunk = true;
-                                scoutJobInstance.steppingProgress++;
-
-                                scoutJobInstance.PerformStep();
-
-                                break;
-                            }
-
-                            scoutJobInstance.steppingProgress++;
-
-                            scoutJobInstance.PerformStep();
-                        }
-
-                        scoutJobInstance.PathState = ScoutJobInstance.PathingState.Turning;
-                        break;
-                    case ScoutJobInstance.PathingState.Turning:
-                        scoutJobInstance.TurnClockwise();
-                        scoutJobInstance.StartMoving();
-                        break;
-                }
-
-                if (!scoutJobInstance.IsOutsideMinimumRange(checkedPosition, scoutJobInstance.GetScoutBanner()))
-                {
-                    continue;
-                }
-
-                if (foundChunk)
-                {
-                    ScoutJobHelper.WriteLog(checkedPosition.ToString());
-                    return true;
-                }
-            }
-
-            output = Vector3Int.invalidPos;
-            return false;
         }
 
         public void OnGoalChanged(BlockJobInstance instance, NPCBase.NPCGoal goalOld, NPCBase.NPCGoal goalNew)
@@ -209,7 +111,7 @@ namespace Colonisation.ScoutJob
 
             var commenceBaseBuild = false;
 
-            if (!scoutJobInstance.IsOutsideMinimumRange(scoutJobInstance.Position, scoutJobInstance.GetColony().Banners[0]))
+            if (!scoutJobInstance.IsOutsideMinimumRange(scoutJobInstance.Position, scoutJobInstance.Colony.Banners[0]))
             {
                 return;
             }

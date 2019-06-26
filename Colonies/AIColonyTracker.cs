@@ -20,12 +20,14 @@ namespace Colonisation.Colonies
             get { return instance; }
         }
 
-        public static AIColony AddColony(BlockEntities.Implementations.BannerTracker.Banner banner)
+        public static AIColony AddColony(Players.Player player, string colonyName, StarterPacks.StarterPack pack)
         {
-            AIColony newAiColony = new AIColony(banner.Colony.Owners[0]);
-            Instance.Colonies.Add(newAiColony);
+            ColonyTracker colonyTracker = new ColonyTracker();
+            AIColony newAIColony = (AIColony)colonyTracker.CreateNew(player, colonyName, pack);
 
-            return newAiColony;
+            Instance.Colonies.Add(newAIColony);
+
+            return newAIColony;
         }
     }
 }

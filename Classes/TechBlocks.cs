@@ -23,8 +23,8 @@
     [ModLoader.ModManager]
     public static class GeneralBlocks
     {
-        public static ushort ScoutRallyPoint;
-        public static ushort AIColonyBanner;
+        public static ItemTypes.ItemType ScoutRallyPoint;
+        public static ItemTypes.ItemType AIColonyBanner;
 
         public static void ResolveIndices()
         {
@@ -32,13 +32,15 @@
             GeneralBlocks.AIColonyBanner = GeneralBlocks.ToIndex("aicolonybanner");
         }
 
-        private static ushort ToIndex(string name)
+        private static ItemTypes.ItemType ToIndex(string name)
         {
-            ushort index;
-            if (ItemTypes.IndexLookup.TryGetIndex(name, out index))
+            ItemTypes.ItemType index;
+            index = ItemTypes.GetType(name);
+
+            if (index != null)
                 return index;
             Pipliz.Log.WriteWarning<string>("Could not find GeneralBlock type {0}", name);
-            return 0x539;
+            return null;
         }
     }
 }

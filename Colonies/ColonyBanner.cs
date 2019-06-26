@@ -6,7 +6,9 @@ namespace Colonisation.Colonies
     [ModLoader.ModManager]
     class ColonyBanner : BlockEntities.Implementations.BannerTracker.Banner
     {
-        public ColonyBanner(Vector3Int pos, ByteReader reader) : base(pos, reader);
+        public ColonyBanner(Vector3Int pos, Colony colony) : base(pos, colony)
+        {
+        }
 
         public void OnRemove()
         {

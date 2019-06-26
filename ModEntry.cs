@@ -11,9 +11,9 @@ namespace Colonisation.NewJobs
         public static string LocalizationFolder;
         public static Version ModVersion = new Version(0, 0, 0, 1);
         public const string ModName = "Colonisation";
-        public const string Naming = "Colonisation.Jobs.";
+        public const string Naming = "Colonisation.NewJobs.";
 
-        [ModLoader.ModCallback(ModLoader.EModCallbackType.AfterModsLoaded, Naming + "AfterModsLoaded")]
+        
         [ModLoader.ModCallbackProvidesFor("Colonisation.Colonisation.Dependencies")]
         [ModLoader.ModCallback(ModLoader.EModCallbackType.OnAssemblyLoaded, Naming + "OnAssemblyLoaded")]
         public static void OnAssemblyLoaded(string path)
@@ -28,8 +28,6 @@ namespace Colonisation.NewJobs
             string versionURL = "https://raw.githubusercontent.com/Magikaas/Colonisation/master/Colonisation.md";
 
             PhentrixGames.NewColonyAPI.Helpers.Utilities.WriteLog("Colonisation", "Modname: " + ModName + ". ModFolder: " + ModFolder + ". Config: " + ModFolder + "/config. VersionURL: " + versionURL);
-            
-            PhentrixGames.NewColonyAPI.Managers.ModManager.RegisterMod(ModName, ModFolder, ModVersion, ModFolder + "/config");
         }
 
         [ModLoader.ModCallback(ModLoader.EModCallbackType.AfterItemTypesDefined, Naming + "RegisterJobs")]

@@ -6,19 +6,14 @@ using PhentrixGames.NewColonyAPI.Helpers;
 using Pipliz;
 using System.Collections.Generic;
 using Math = Pipliz.Math;
+using UnityEngine;
 
 namespace Colonisation.ScoutJob
 {
     public class ScoutJobInstance : BlockJobInstance
     {
 
-        public ScoutJobInstance(IBlockJobSettings settings, Pipliz.Vector3Int position, ItemTypes.ItemType type, ByteReader reader) : base(settings, position, type, reader) {
-            this.Settings = settings;
-            this.Position = position;
-        }
-
-        public ScoutJobInstance(IBlockJobSettings settings, Pipliz.Vector3Int position, ItemTypes.ItemType type, Colony colony) : base(settings, position, type, colony)
-        {
+        public ScoutJobInstance(IBlockJobSettings settings, Vector3Int position, ItemTypes.ItemType type, ByteReader reader) : base(settings, position, type, reader) {
             this.Settings = settings;
             this.Position = position;
         }
@@ -37,7 +32,7 @@ namespace Colonisation.ScoutJob
 
         private RecordedHeight[] heightsTable;
 
-        public bool StockedUp;
+        private bool StockedUp;
 
         //Amount of chunks away from scout to check for suitability (0 = own chunk, 1 = 3x3, 2 = 5x5, etc...)
         private int ChunkCheckRange = 1;
@@ -51,7 +46,7 @@ namespace Colonisation.ScoutJob
         private int MinChunkScoutRange = 2;
 
         //Max range from scout rally point to scout, to avoid NPCs going too far away from the base
-        public int MaxChunkScoutRange = 10;
+        private int MaxChunkScoutRange = 10;
 
         public ScoutJobGlobals.ScoutActivity Activity;
 
@@ -68,9 +63,6 @@ namespace Colonisation.ScoutJob
             return this;
         }
 
-        /**
-         * Nothing here.
-         */
         public override NPCBase.NPCGoal CalculateGoal(ref NPCBase.NPCState state)
         {
             //WriteLog("CalculateGoal");
@@ -79,30 +71,27 @@ namespace Colonisation.ScoutJob
             return NPCBase.NPCGoal.Job;
         }
 
-        /**
-         * 
-         */
-        public BlockEntities.Implementations.BannerTracker.Banner GetScoutBanner()
+        private BlockEntities.Implementations.BannerTracker.Banner GetScoutBanner()
         {
-            return this.NPC.Colony.GetRandomBanner();
+            return BannerTracker.Get(GetColonyOwners());
         }
 
         #region ChunkFinding
         
-        public int stepAmount = 0, stepIncrease = 16;
+        private int stepAmount = 0, stepIncrease = 16;
 
-        public int pathingX = 0, pathingZ = 0, xStart = 0, zStart = 0;
+        private int pathingX = 0, pathingZ = 0, xStart = 0, zStart = 0;
 
-        public enum PathingState
+        private enum PathingState
         {
             Started,
             Turning,
             Stepping
         }
 
-        public PathingState PathState = PathingState.Started;
+        private PathingState PathState = PathingState.Started;
         
-        public enum PathingDirection
+        private enum PathingDirection
         {
             NORTH,
             EAST,
@@ -110,9 +99,9 @@ namespace Colonisation.ScoutJob
             WEST
         }
         
-        public PathingDirection Direction = PathingDirection.NORTH;
+        private PathingDirection Direction = PathingDirection.NORTH;
 
-        public int steppingProgress = 0;
+        private int steppingProgress = 0;
 
         private void debugPrintDirection()
         {
@@ -161,7 +150,7 @@ namespace Colonisation.ScoutJob
             }
         }
 
-        public void TurnClockwise()
+        protected void TurnClockwise()
         {
             //Always turn clock-wise
             switch (Direction)
@@ -187,7 +176,7 @@ namespace Colonisation.ScoutJob
             }
         }
 
-        public void PerformStep()
+        protected void PerformStep()
         {
             switch (Direction)
             {
@@ -211,7 +200,7 @@ namespace Colonisation.ScoutJob
             Vector3Int targetPosition = new Vector3Int(pathingX, NPC.Position.y, pathingZ);
 
             // To show where we have checked, add a visual landmark in the game
-            createPillarAbove(targetPosition, BlockTypes.BuiltinBlocks.Indices.bricksdarkyellow);
+            createPillarAbove(targetPosition, BlockTypes.BuiltinBlocks.BricksBlack);
 
             debugPrintDirection();
             WriteLog("Going to: " + targetPosition.ToString());
@@ -222,7 +211,7 @@ namespace Colonisation.ScoutJob
             WriteLog("X: " + (pathingX - xStart) + ". Z: " + (pathingZ - zStart));
         }
 
-        public void StartMoving()
+        protected void StartMoving()
         {
             steppingProgress = 0;
 
@@ -247,10 +236,8 @@ namespace Colonisation.ScoutJob
             checkedPosition = new Vector3Int(this.pathingX, y, this.pathingZ);
 
             Vector3Int aaaa = checkedPosition;
-
-            bool canStand;
-
-            if(!AI.PathingManager.TryGetClosestPositionWorld(checkedPosition, NPC.Position, out canStand, out checkedPosition))
+            
+            if(!FindGroundChunkVertical(checkedPosition, out checkedPosition))
             {
                 WriteLog("Could not find anything! " + aaaa.ToString());
                 return false;
@@ -315,7 +302,7 @@ namespace Colonisation.ScoutJob
             return false;
         }
 
-        public bool CoordWithinBounds(int x, int z, int xStart, int zStart, int MaxRange)
+        private bool CoordWithinBounds(int x, int z, int xStart, int zStart, int MaxRange)
         {
             bool InXRange = (x > (xStart - MaxRange)) && (x < (xStart + MaxRange));
             bool InZRange = (z > (zStart - MaxRange)) && (z < (zStart + MaxRange));
@@ -327,9 +314,7 @@ namespace Colonisation.ScoutJob
         {
             targetPosition = new Vector3Int(x, y, z).ToChunk();
 
-            bool canStand;
-
-            AI.PathingManager.TryGetClosestPositionWorld(targetPosition, NPC.Position, out canStand, out targetPosition);
+            FindGroundChunkVertical(targetPosition, out targetPosition);
 
             if (targetPosition.x == -1 || targetPosition.y == -1 || targetPosition.z == -1)
             {
@@ -440,7 +425,7 @@ namespace Colonisation.ScoutJob
         {
             keyName = NPC.NPCType.Type.ToString(),
             printName = "Scout",
-            maskColor1 = new UnityEngine.Color32(255, 255, 255, 255),
+            maskColor1 = new Color32(255, 255, 255, 255),
             type = NPCTypeID.GetNextID(),
             inventoryCapacity = 20,
             movementSpeed = 15
@@ -524,7 +509,7 @@ namespace Colonisation.ScoutJob
         {
             if(World.TryGetTypeAt(position, out ushort existingType))
             {
-                if(replaceBlock && BlockTypes.BuiltinBlocks.Indices.air != existingType)
+                if(replaceBlock && BlockTypes.BuiltinBlocks.Air != existingType)
                 {
                     NPCRemoveBlock(position);
                 }
@@ -566,7 +551,7 @@ namespace Colonisation.ScoutJob
             return Math.Pow2(blockCheck);
         }
 
-        public Suitability calculateAreaSuitability()
+        private Suitability calculateAreaSuitability()
         {
             ushort typeToCheck;
 
@@ -641,7 +626,7 @@ namespace Colonisation.ScoutJob
             return GetColony().Owners;
         }
 
-        public Colony GetColony()
+        private Colony GetColony()
         {
             return NPC.Colony;
         }

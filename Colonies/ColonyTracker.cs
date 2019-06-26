@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using BlockTypes.Builtin;
 
 namespace Colonisation.Colonies
 {
@@ -23,8 +22,7 @@ namespace Colonisation.Colonies
 
         public static AIColony AddColony(BlockEntities.Implementations.BannerTracker.Banner banner)
         {
-            AIColony newAiColony = new AIColony(banner.Colony.Owners.);
-            BannerTracker.Add(banner.KeyLocation, BuiltinBlocks.Banner, banner.Owner);
+            AIColony newAiColony = new AIColony(banner.Colony.ColonyID);
             Instance.Colonies.Add(newAiColony);
 
             return newAiColony;
